@@ -6,7 +6,6 @@
 #include <kernel/util/asm.h>
 #include <kernel/util/kassert.h>
 #include <kernel/util/kprintf.h>
-#include <stdlib/array.h>
 
 void memset(void* ptr, u8 value, u32 size)
 {
