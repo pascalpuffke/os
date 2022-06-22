@@ -5,7 +5,7 @@ namespace Kernel::IO::Serial {
 static constexpr u16 serial_port = 0x3F8;
 static bool initialized = false;
 
-bool initialize()
+Result<void> initialize()
 {
     outb(serial_port + 1, 0x00); // Disable all interrupts
     outb(serial_port + 3, 0x80); // Enable DLAB (set baud rate divisor)
@@ -19,12 +19,12 @@ bool initialize()
 
     // Check if the serial chip is faulty
     if (inb(serial_port) != 0xAE)
-        return false;
+        return Error { "Faulty serial chip" };
 
     // If serial is not faulty, set the serial chip to normal mode
     outb(serial_port + 4, 0x0F);
     initialized = true;
-    return true;
+    return {};
 }
 
 bool ready()

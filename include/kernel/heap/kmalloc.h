@@ -11,13 +11,13 @@ void operator delete(void*, usize);
 
 class MemoryManager final {
 public:
-    static MemoryManager& the()
+    static MemoryManager& get()
     {
         static MemoryManager instance;
         return instance;
     }
 
-    void initialize(void*, usize);
+    void initialize(u64, u64);
     void* allocate(usize);
     void* allocate_aligned(usize, usize);
     void free(void*);
@@ -30,8 +30,8 @@ public:
     usize total() const;
 
 private:
-    void* m_memory_start;
-    usize m_memory_size;
+    u64 m_memory_start;
+    u64 m_memory_size;
     usize m_allocation_count;
     usize m_allocated;
     usize m_free_count;

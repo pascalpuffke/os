@@ -1,17 +1,28 @@
 #pragma once
 
-// This is NOT thoroughly tested and there is a lot of error potential in this class.
-// Use with caution, might behave in unexpected ways.
-
+#ifdef KERNEL
 #include <kernel/util/kassert.h>
+#endif
 #include <stdlib/optional.h>
 
+/**
+ * Simple Error type used as the default error type for Result.
+ * It is a wrapper around a `const char*`.
+ * @see Result
+ */
 class Error final {
 public:
+    /**
+     * Constructs an empty Error, setting its internal message to `nullptr`.
+     */
     constexpr Error()
         : m_message(nullptr)
     {
     }
+    /**
+     * Constructs an Error with the given message.
+     * @param message The message to set.
+     */
     constexpr Error(const char* message)
         : m_message(message)
     {
@@ -26,12 +37,31 @@ public:
     constexpr bool operator==(const Error& other) const { return m_message == other.m_message; }
     constexpr bool operator!=(const Error& other) const { return !(*this == other); }
 
+    /**
+     * @brief Returns the message of this Error.
+     *
+     * @return The message of this Error, or `nullptr` if this Error is empty.
+     */
     constexpr const char* message() const { return m_message; }
 
 private:
     const char* m_message;
 };
 
+/**
+ * Result type used for error handling.
+ * Supports chaining similar to Rust's std::result<T, E> type.
+ * @code {.cpp}
+ * // Example usage:
+ * Result<int> res = 10;
+ * const auto number = res
+ *                        .and_then([](auto x) { return x * 2; })
+ *                        .and_then([](auto x) { return x + 49; })
+ *                        .or_else([](auto e) { kprintf("Error: %s\n", e.message()); return 0; })
+ *                        .value();
+ * printf("Result: %d\n", number); // Prints "Result: 69"
+ * @endcode
+ */
 template <typename T, typename E = Error>
 class Result final {
 public:
@@ -60,44 +90,99 @@ public:
 
     [[nodiscard]] constexpr bool has_value() const { return m_value.has_value(); }
     [[nodiscard]] constexpr bool has_error() const { return m_error.has_value(); }
+    /**
+     * Returns whether this Result holds a value.
+     * @see has_value()
+     * @return `true` if this Result holds a value, `false` if it holds an error.
+     */
     [[nodiscard]] constexpr operator bool() const { return has_value(); }
 
-    /// @brief Returns the value type if it is present, otherwise panics.
+    /**
+     * Returns the value of this Result or panics if this Result holds an error.
+     * @note As this function returns a reference, it is not safe to call it on a Result that holds an error.
+     *       Use `has_value()` to check if this Result holds a value before calling this function, as otherwise
+     *       it will panic.
+     * @return The value of this Result.
+     */
     [[nodiscard]] constexpr T& value()
     {
+#ifdef KERNEL
         kassert_msg(has_value(), "Result::value() called on empty Result");
+#endif
         return m_value.value();
     }
-    /// @brief Returns the value type if it is present, otherwise panics.
+
+    /**
+     * Returns the value of this Result or panics if this Result holds an error.
+     * @note As this function returns a reference, it is not safe to call it on a Result that holds an error.
+     *       Use `has_value()` to check if this Result holds a value before calling this function, as otherwise
+     *       it will panic.
+     * @return The value of this Result.
+     */
     [[nodiscard]] constexpr const T& value() const
     {
+#ifdef KERNEL
         kassert_msg(has_value(), "Result::value() called on empty Result");
+#endif
         return m_value.value();
     }
 
-    /// @brief Returns the error type if it is present, otherwise panics.
+    /**
+     * Returns the error of this Result or panics if this Result holds a value.
+     * @note As this function returns a reference, it is not safe to call it on a Result that holds a value.
+     *       Use `has_error()` to check if this Result holds an error before calling this function, as otherwise
+     *       it will panic.
+     * @return The error of this Result.
+     */
     [[nodiscard]] constexpr E& error()
     {
+#ifdef KERNEL
         kassert_msg(has_error(), "Result::error() called on empty Result");
+#endif
         return m_error.value();
     }
-    /// @brief Returns the error type if it is present, otherwise panics.
+
+    /**
+     * Returns the error of this Result or panics if this Result holds a value.
+     * @note As this function returns a reference, it is not safe to call it on a Result that holds a value.
+     *       Use `has_error()` to check if this Result holds an error before calling this function, as otherwise
+     *       it will panic.
+     * @return The error of this Result.
+     */
     [[nodiscard]] constexpr const E& error() const
     {
+#ifdef KERNEL
         kassert_msg(has_error(), "Result::error() called on empty Result");
+#endif
         return m_error.value();
     }
 
-    /// @brief Returns the value type if it is present. Falls back to the default value otherwise.
+    /**
+     * Returns the value of this Result or the given default value if this Result holds an error.
+     * @param default_value The default value to return if this Result is empty.
+     * @return The value type if it is present, falling back to the default value otherwise.
+     */
     [[nodiscard]] constexpr T& value_or(T& default_value) { return has_value() ? value() : default_value; }
-    /// @brief Returns the value type if it is present. Falls back to the default value otherwise.
+    /**
+     * Returns the value of this Result or the given default value if this Result holds an error.
+     * @param default_value The default value to return if this Result is empty.
+     * @return The value type if it is present, falling back to the default value otherwise.
+     */
     [[nodiscard]] constexpr const T& value_or(const T& default_value) const { return has_value() ? value() : default_value; }
 
-    /// @brief Returns the value type if it is present. Otherwise, it returns lazily evaluated default value.
+    /**
+     * Returns the value of this Result or the given lazily evaluated default value if this Result holds an error.
+     * @param f The function to call if this Result does not hold a value.
+     * @return The value type if it is present, otherwise falling back to lazily evaluated default value.
+     */
     template <typename F>
     [[nodiscard]] constexpr T value_or_else(F&& f) { return has_value() ? value() : f(); }
 
-    /// @brief Transforms the value type if it is present. Otherwise, it returns the Result with the error.
+    /**
+     * Maps a `Result<T, E>` to a `Result<U, E>` by applying a function to a contained value.
+     * @param f The function to apply.
+     * @return A new Result with the transformed value type if it is present, otherwise with the error of this Result.
+     */
     template <typename F>
     [[nodiscard]] constexpr Result<T, E> map(F&& f) const
     {
@@ -106,16 +191,11 @@ public:
         return Result<T, E>(m_error.value());
     }
 
-    /// @brief If the Result holds a value type, it calls given function with the value. Otherwise, returns the Result with the error type.
-    template <typename F>
-    [[nodiscard]] constexpr Result<T, E> and_then(F&& f) const
-    {
-        if (has_value())
-            return f(m_value.value());
-        return Result<T, E>(m_error.value());
-    }
-
-    /// @brief If the Result does not hold a value type, it calls given function with the error. Otherwise, returns the Result with the value type.
+    /**
+     * Maps a `Result<T, E>` to a `Result<T, F>` by applying a function to a contained error.
+     * @param f The function to apply.
+     * @return A new Result with the transformed error type if it is present, otherwise with the error of this Result.
+     */
     template <typename F>
     [[nodiscard]] constexpr Result<T, E> or_else(F&& f) const
     {
@@ -132,6 +212,7 @@ private:
 template <typename E>
 class Result<void, E> final {
 public:
+    constexpr Result() { }
     constexpr Result(const E& error)
         : m_error(error)
     {
@@ -151,22 +232,24 @@ public:
     }
     constexpr bool operator!=(const Result& other) const { return !(*this == other); }
 
-    [[nodiscard]] constexpr bool has_value() const { return false; }
     [[nodiscard]] constexpr bool has_error() const { return m_error.has_value(); }
-    [[nodiscard]] constexpr operator bool() const { return false; }
+    [[nodiscard]] constexpr bool has_value() const { return !has_error(); }
+    [[nodiscard]] constexpr operator bool() const { return has_value(); }
 
     constexpr void value() { }
 
-    /// @brief Returns the error type if it is present, otherwise panics.
     [[nodiscard]] constexpr E& error()
     {
+#ifdef KERNEL
         kassert_msg(has_error(), "Result::error() called on empty Result");
+#endif
         return m_error.value();
     }
-    /// @brief Returns the error type if it is present, otherwise panics.
     [[nodiscard]] constexpr const E& error() const
     {
+#ifdef KERNEL
         kassert_msg(has_error(), "Result::error() called on empty Result");
+#endif
         return m_error.value();
     }
 

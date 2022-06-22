@@ -1,10 +1,11 @@
 #pragma once
 
 #include <kernel/io/io.h>
+#include <stdlib/result.h>
 
 namespace Kernel::IO::Serial {
 
-bool initialize();
+Result<void> initialize();
 bool ready();
 bool received();
 bool is_transmit_empty();

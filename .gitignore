@@ -1,0 +1,7 @@
+.vscode/
+build/
+docs/
+gnu/
+iso/
+kernel.iso
+Doxyfile.bak

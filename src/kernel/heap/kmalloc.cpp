@@ -4,6 +4,7 @@
 
 #include <kernel/heap/kmalloc.h>
 #include <kernel/util/asm.h>
+#include <kernel/util/interrupt_scope.h>
 #include <kernel/util/kassert.h>
 #include <kernel/util/kprintf.h>
 
@@ -21,69 +22,77 @@ struct [[gnu::packed]] Block {
 
 // The heap is split into chunks of this size.
 static constexpr usize CHUNK_SIZE = 64;
-// 512 MiB ought to be enough for anybody.
-// TODO: Use an algorithm to determine the best size based on the system's memory.
-static constexpr usize POOL_SIZE = (512 * 1024);
+static constexpr usize POOL_SIZE = (1 * MiB);
+static constexpr usize BITMAP_SIZE = (POOL_SIZE / CHUNK_SIZE / 8);
 // 1 bit per chunk. 1 = allocated, 0 = free.
-static u8 pool[POOL_SIZE / CHUNK_SIZE / 8] __attribute__((used));
+static u8 bitmap[BITMAP_SIZE];
 
-void MemoryManager::initialize(void* memory_start, usize memory_size)
+void MemoryManager::initialize(u64 memory_start, u64 memory_size)
 {
-    // To avoid writing over other data
-    m_memory_start = reinterpret_cast<u8*>(memory_start) + 0x10000;
+    m_memory_start = memory_start;
     m_memory_size = memory_size;
     m_free = POOL_SIZE;
 
-    memset(pool, 0, POOL_SIZE / CHUNK_SIZE / 8);
-    memset(m_memory_start, 0, POOL_SIZE);
+    memset(bitmap, 0, BITMAP_SIZE);
+    memset(reinterpret_cast<void*>(m_memory_start), 0, POOL_SIZE);
 
-    kprintf("MemoryManager initialized, %dK available @ %d byte chunks\n", POOL_SIZE / 1024, CHUNK_SIZE);
+    // TODO fix this stupid kprintf bug
+    // kprintf("MemoryManager initialized @ 0x%X, %dK available @ %d byte chunks\n", memory_start, POOL_SIZE / KiB, CHUNK_SIZE);
+    // ... prints: MemoryManager initialized @ 0x200000, 0K available @ 64 byte chunks
+    kprintf("MemoryManager initialized @ 0x%X, ", memory_start);
+    kprintf("%dK available @ %d byte chunks\n", POOL_SIZE / KiB, CHUNK_SIZE);
+    // ... prints: MemoryManager initialized @ 0x200000, 1024K available @ 64 byte chunks
 }
 
 void* MemoryManager::allocate(usize size)
 {
-    Kernel::cli();
+    Kernel::InterruptScope scope;
     ++m_allocation_count;
 
-    usize real_size = size + sizeof(Block);
-    kassert(m_free > real_size);
+    auto real_size = size + sizeof(Block);
+    kassert_msg(m_free > real_size, "Ran out of memory. Oops!");
 
-    usize chunks_needed = real_size / CHUNK_SIZE;
+    auto chunks_needed = real_size / CHUNK_SIZE;
     if (real_size % CHUNK_SIZE)
-        ++chunks_needed;
+        chunks_needed++;
+
+    auto is_chunk_free = [](usize chunk, u8 bit) {
+        return (bitmap[chunk] & (1 << bit)) == 0;
+    };
 
     usize chunks_here = 0;
     usize first_chunk = 0;
-
-    for (usize i = 0; i < (POOL_SIZE / CHUNK_SIZE / 8); ++i) {
-        if (pool[i] == 0xFF) {
+    for (usize chunk = 0; chunk < BITMAP_SIZE; chunk++) {
+        if (bitmap[chunk] == 0xFF) {
             chunks_here = 0;
             continue;
         }
 
-        for (usize j = 0; j < 8; ++j) {
-            if (!(pool[i] & (1 << j))) {
-                if (chunks_here++ == 0)
-                    first_chunk = i * 8 + j;
-
-                if (chunks_here == chunks_needed) {
-                    auto* block = reinterpret_cast<Block*>((usize)m_memory_start + first_chunk * CHUNK_SIZE);
-                    u8* pointer = reinterpret_cast<u8*>(block);
-                    pointer += sizeof(Block);
-                    block->chunk = chunks_needed;
-                    block->start = first_chunk;
-
-                    for (usize k = 0; k < first_chunk + chunks_needed; ++k) {
-                        pool[first_chunk / 8] |= (1 << (first_chunk % 8));
-                    }
-
-                    m_allocated += block->chunk * CHUNK_SIZE;
-                    m_free -= block->chunk * CHUNK_SIZE;
-
-                    return pointer;
-                }
-            } else {
+        for (u8 bit = 0; bit < 8; bit++) {
+            if (!is_chunk_free(chunk, bit)) {
                 chunks_here = 0;
+                continue;
+            }
+
+            if (chunks_here == 0)
+                first_chunk = chunk * 8 + bit;
+            chunks_here++;
+
+            if (chunks_here == chunks_needed) {
+                auto* block = reinterpret_cast<Block*>((u32)m_memory_start + (first_chunk * CHUNK_SIZE));
+                auto* pointer = reinterpret_cast<u8*>(block);
+                pointer += sizeof(Block);
+                block->chunk = chunks_needed;
+                block->start = first_chunk;
+
+                for (auto current_chunk = first_chunk; current_chunk < (first_chunk + chunks_needed); current_chunk++) {
+                    bitmap[current_chunk / 8] |= (1 << (current_chunk % 8));
+                }
+
+                m_allocated += block->chunk * CHUNK_SIZE;
+                m_free -= block->chunk * CHUNK_SIZE;
+
+                return pointer;
             }
         }
     }
@@ -96,10 +105,10 @@ void* MemoryManager::allocate(usize size)
 
 void* MemoryManager::allocate_aligned(usize size, usize alignment)
 {
-    void* ptr = kmalloc(size + alignment + sizeof(void*));
-    usize max_addr = reinterpret_cast<usize>(ptr) + alignment;
-    void* aligned_ptr = reinterpret_cast<void*>(max_addr - (max_addr % alignment));
-    ((void**)aligned_ptr)[-1] = ptr;
+    auto* ptr = kmalloc(size + alignment + sizeof(void*));
+    auto max_addr = reinterpret_cast<usize>(ptr) + alignment;
+    auto* aligned_ptr = reinterpret_cast<void*>(max_addr - (max_addr % alignment));
+    reinterpret_cast<void**>(aligned_ptr)[-1] = ptr;
     return aligned_ptr;
 }
 
@@ -110,13 +119,13 @@ void MemoryManager::free(void* ptr)
 
     kassert(is_kmalloc_address(ptr));
 
-    Kernel::cli();
+    Kernel::InterruptScope scope;
     ++m_free_count;
 
     auto* block = reinterpret_cast<Block*>((usize)ptr - sizeof(Block));
 
-    for (usize i = block->start; i < block->start + block->chunk; ++i) {
-        pool[i / 8] &= ~(1 << (i % 8));
+    for (auto i = block->start; i < block->start + block->chunk; ++i) {
+        bitmap[i / 8] &= ~(1 << (i % 8));
     }
 
     m_allocated -= block->chunk * CHUNK_SIZE;
@@ -134,27 +143,17 @@ bool MemoryManager::is_kmalloc_address(const void* ptr)
 }
 
 usize MemoryManager::allocations() const { return m_allocation_count; }
-
 usize MemoryManager::frees() const { return m_free_count; }
-
 usize MemoryManager::allocated() const { return m_allocated; }
-
 usize MemoryManager::available() const { return m_free; }
-
 usize MemoryManager::total() const { return POOL_SIZE; }
 
-void* kmalloc(usize size) { return MemoryManager::the().allocate(size); }
-
-void kfree(void* ptr) { MemoryManager::the().free(ptr); }
+void* kmalloc(usize size) { return MemoryManager::get().allocate(size); }
+void kfree(void* ptr) { MemoryManager::get().free(ptr); }
 
 void* operator new(usize size) { return kmalloc(size); }
-
 void* operator new[](usize size) { return kmalloc(size); }
-
 void operator delete(void* ptr) { kfree(ptr); }
-
 void operator delete[](void* ptr) { kfree(ptr); }
-
 void operator delete(void* ptr, usize) { kfree(ptr); }
-
 void operator delete[](void* ptr, usize) { kfree(ptr); }

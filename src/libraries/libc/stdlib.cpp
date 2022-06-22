@@ -1,7 +1,7 @@
 #include <kernel/heap/kmalloc.h>
 #include <libc/stdlib.h>
 
-#define MM MemoryManager::the()
+#define MM MemoryManager::get()
 
 void* malloc(size_t size)
 {

@@ -20,3 +20,7 @@ using isize = intptr_t;
 
 using f32 = float;
 using f64 = double;
+
+static constexpr usize KiB = 1024;
+static constexpr usize MiB = 1024 * KiB;
+static constexpr usize GiB = 1024 * MiB;

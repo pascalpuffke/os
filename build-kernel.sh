@@ -113,7 +113,7 @@ make_iso() {
 }
 
 run_qemu() {
-	local qemu_flags="-serial stdio -m 2G"
+	local qemu_flags="-serial stdio -m 3G --enable-kvm"
 
 	if [ $USE_ISO -eq 0 ]; then
 		echo -e "    \e[36mRunning \e[0mQEMU with raw multiboot kernel..."
@@ -135,7 +135,7 @@ build() {
 build
 
 if [ "$1" == "run" ]; then
-	if [ "$USE_ISO" == "1" ]; then
+	if [ $USE_ISO -eq 1 ]; then
 		make_iso
 		run_qemu
 	else
