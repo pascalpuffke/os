@@ -53,6 +53,13 @@ int vkprintf(const char* format, va_list args)
         if (*format == '%') {
             ++format;
             switch (*format) {
+            case 'p': {
+                u32 integer = va_arg(args, u32);
+                // NOTE: The Standard C Library does not want me to print the 0x prefix for pointers, but I don't care.
+                written += _kprintf_string("0x");
+                written += _kprintf_hex(integer, false);
+                break;
+            }
             case 'c': {
                 auto c = va_arg(args, int);
                 written += _kprintf_char(c);
