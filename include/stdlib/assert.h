@@ -5,9 +5,11 @@
 #endif
 
 #ifdef KERNEL
-#define ASSERT(expr) kassert(expr)
-#define ASSERT_MSG(expr, msg) kassert_msg(expr, msg)
+#define assert(expr) kassert(expr)
+#define assert_msg(expr, msg) kassert_msg(expr, msg)
+#define stub() kstub()
 #else
-#define ASSERT(expr) ((void)0)
-#define ASSERT_MSG(expr, msg) ((void)0)
+#define assert(expr) ((void)0)
+#define assert_msg(expr, msg) ((void)0)
+#define stub() ((void)0)
 #endif

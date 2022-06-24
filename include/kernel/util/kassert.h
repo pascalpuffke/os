@@ -12,3 +12,5 @@ void _kassert_msg(const char* file, int line, const char* func, const char* expr
 #define kassert_msg(expr, msg) \
     if (!(expr))               \
     _kassert_msg(__FILE__, __LINE__, __PRETTY_FUNCTION__, #expr, msg)
+
+#define kstub() kassert_msg(false, "Stub called")
