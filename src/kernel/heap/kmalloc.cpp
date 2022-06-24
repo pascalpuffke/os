@@ -22,13 +22,15 @@ struct [[gnu::packed]] Block {
 
 // The heap is split into chunks of this size.
 static constexpr usize CHUNK_SIZE = 64;
-static constexpr usize POOL_SIZE = (1 * MiB);
+static constexpr usize POOL_SIZE = (4 * MiB);
 static constexpr usize BITMAP_SIZE = (POOL_SIZE / CHUNK_SIZE / 8);
 // 1 bit per chunk. 1 = allocated, 0 = free.
 static u8 bitmap[BITMAP_SIZE];
 
 void MemoryManager::initialize(u64 memory_start, u64 memory_size)
 {
+    kassert_msg(memory_size > POOL_SIZE, "Not enough memory for the heap");
+
     m_memory_start = memory_start;
     m_memory_size = memory_size;
     m_free = POOL_SIZE;
@@ -39,8 +41,8 @@ void MemoryManager::initialize(u64 memory_start, u64 memory_size)
     // TODO fix this stupid kprintf bug
     // kprintf("MemoryManager initialized @ 0x%X, %dK available @ %d byte chunks\n", memory_start, POOL_SIZE / KiB, CHUNK_SIZE);
     // ... prints: MemoryManager initialized @ 0x200000, 0K available @ 64 byte chunks
-    kprintf("MemoryManager initialized @ 0x%X, ", memory_start);
-    kprintf("%dK available @ %d byte chunks\n", POOL_SIZE / KiB, CHUNK_SIZE);
+    kprintf("Heap initialized @ 0x%X, ", memory_start);
+    kprintf("%dK configured @ %d byte chunks\n", POOL_SIZE / KiB, CHUNK_SIZE);
     // ... prints: MemoryManager initialized @ 0x200000, 1024K available @ 64 byte chunks
 }
 
@@ -97,8 +99,7 @@ void* MemoryManager::allocate(usize size)
         }
     }
 
-    kprintf("MemoryManager: Out of memory.\n");
-    kassert(false);
+    kassert_msg(false, "MemoryManager: Out of memory.");
 
     return nullptr;
 }
