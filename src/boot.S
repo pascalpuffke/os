@@ -19,19 +19,6 @@ forced to be within the first 8 KiB of the kernel file.
 .long CHECKSUM
 
 /*
-.long 0
-.long 0 
-.long 0
-.long 0 
-.long 0
-
-.long 0
-.long 1280
-.long 384
-.long 32
-*/
-
-/*
 The multiboot standard does not define the value of the stack pointer register
 (esp) and it is up to the kernel to provide a stack. This allocates room for a
 small stack by creating a symbol at the bottom of it, then allocating 16384
