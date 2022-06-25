@@ -478,6 +478,7 @@ public:
     {
         if (count == 0)
             return *this;
+        reserve(size() + count);
 
         for (size_type i = 0; i < count; ++i)
             push_back(ch);
@@ -510,6 +511,7 @@ public:
         assert(pos <= str.size());
         assert(count == npos || pos + count <= str.size());
         auto adjusted_count = count == npos ? str.size() - pos : count;
+        reserve(size() + adjusted_count);
 
         for (auto i = pos; i < pos + adjusted_count; ++i)
             push_back(str.at(i));
@@ -527,6 +529,7 @@ public:
      */
     constexpr BasicString& append(const_pointer s, size_type count)
     {
+        reserve(size() + count);
         for (size_type i = 0; i < count; ++i)
             push_back(s[i]);
 
