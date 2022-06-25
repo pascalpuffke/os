@@ -8,12 +8,7 @@
 #include <kernel/util/kassert.h>
 #include <kernel/util/kprintf.h>
 
-void memset(void* ptr, u8 value, u32 size)
-{
-    u8* p = (u8*)ptr;
-    for (u32 i = 0; i < size; i++)
-        p[i] = value;
-}
+#include <libc/string.h>
 
 struct [[gnu::packed]] Block {
     u32 start;
@@ -39,11 +34,11 @@ void MemoryManager::initialize(u64 memory_start, u64 memory_size)
     memset(reinterpret_cast<void*>(m_memory_start), 0, POOL_SIZE);
 
     // TODO fix this stupid kprintf bug
-    // kprintf("MemoryManager initialized @ 0x%X, %dK available @ %d byte chunks\n", memory_start, POOL_SIZE / KiB, CHUNK_SIZE);
-    // ... prints: MemoryManager initialized @ 0x200000, 0K available @ 64 byte chunks
+    // kprintf("Heap initialized @ 0x%X, %dK configured @ %d byte chunks\n", memory_start, POOL_SIZE / KiB, CHUNK_SIZE);
+    // ... prints: Heap initialized @ 0x200000, 0K configured @ 64 byte chunks
     kprintf("Heap initialized @ 0x%X, ", memory_start);
     kprintf("%dK configured @ %d byte chunks\n", POOL_SIZE / KiB, CHUNK_SIZE);
-    // ... prints: MemoryManager initialized @ 0x200000, 1024K available @ 64 byte chunks
+    // ... prints: Heap initialized @ 0x200000, 4096K configured @ 64 byte chunks
 }
 
 void* MemoryManager::allocate(usize size)

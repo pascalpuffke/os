@@ -97,7 +97,6 @@ void print_all_cpu_features(Kernel::CPUID& cpuid)
     Kernel::TTY::set_color(Kernel::VGA::Color::LIGHT_GREY, Kernel::VGA::Color::BLACK);
 
     // Loop through all CPU features, check if the CPU has them, and print them.
-    // Needed functions: CPUID::has_feature(), cpu_feature_to_string().
     for (usize i = 0; i < (usize)Kernel::CPUFeature::_LAST; i++) {
         auto feature = (Kernel::CPUFeature)i;
         if (cpuid.has_feature(feature)) {

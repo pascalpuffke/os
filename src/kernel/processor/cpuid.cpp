@@ -102,8 +102,6 @@ const char* CPUID::vendor()
 
 bool CPUID::has_feature(CPUFeature feature)
 {
-    // eax (function) = 1
-    // read from both ecx and edx
     get(CPUIDRequest::GET_FEATURES);
 
 #define FEATURE(feat, reg, bit) \
@@ -179,4 +177,5 @@ bool CPUID::has_feature(CPUFeature feature)
     }
 #undef FEATURE
 }
+
 }
