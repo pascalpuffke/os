@@ -1,9 +1,9 @@
 #define KERNEL
 
-#include <kernel/cpuid.h>
 #include <kernel/heap/kmalloc.h>
 #include <kernel/io/serial.h>
 #include <kernel/multiboot.h>
+#include <kernel/processor/cpuid.h>
 #include <kernel/time/rtc.h>
 #include <kernel/util/asm.h>
 #include <kernel/util/kassert.h>
@@ -11,7 +11,7 @@
 #include <kernel/video/tty.h>
 #include <kernel/video/vga.h>
 
-#include <stdlib/memory/shared_ptr.h>
+#include <stdlib/string.h>
 
 #if defined(__linux__)
 #error "Not using cross-compiler"
@@ -76,10 +76,19 @@ void initialize_memory_manager(u64 extended_memory_start, u64 extended_memory_si
 {
     // The kernel is loaded 1 MiB in at 0x100000 (see linker.ld)
     // To avoid writing over it, we'll start allocating memory at the end of the kernel image.
-    const auto memory_offset = (usize)end_of_kernel_image;
-    const auto offsetted_memory = extended_memory_start + memory_offset;
-    const auto adjusted_memory_size = extended_memory_size - memory_offset;
-    MemoryManager::get().initialize(offsetted_memory, adjusted_memory_size);
+    const auto offset = 0x4000;
+    const auto kernel_size = (usize)end_of_kernel_image - extended_memory_start;
+    const auto adjusted_memory_size = extended_memory_size - kernel_size - offset;
+    MemoryManager::get().initialize((usize)end_of_kernel_image + kernel_size + offset, adjusted_memory_size);
+}
+
+void print_rtc()
+{
+    auto time = Kernel::Time::RTC::now();
+    kprintf("RTC: ");
+    Kernel::TTY::set_color(Kernel::VGA::Color::LIGHT_GREY, Kernel::VGA::Color::BLACK);
+    kprintf("%d/%d/%d at %d:%d:%d\n", time.day, time.month, time.year, time.hour, time.minute, time.second);
+    Kernel::TTY::reset_color();
 }
 
 void print_all_cpu_features(Kernel::CPUID& cpuid)
@@ -100,6 +109,15 @@ void print_all_cpu_features(Kernel::CPUID& cpuid)
     kprintf("\n");
 }
 
+void print_cpu_vendor(Kernel::CPUID& cpuid)
+{
+    const auto* vendor = cpuid.vendor();
+    kprintf("CPU vendor: ");
+    Kernel::TTY::set_color(Kernel::VGA::Color::LIGHT_GREY, Kernel::VGA::Color::BLACK);
+    kprintf("%s\n", vendor);
+    Kernel::TTY::reset_color();
+}
+
 extern "C" void kernel_main(multiboot_info_t* mbd, unsigned int magic)
 {
     using namespace Kernel;
@@ -113,11 +131,7 @@ extern "C" void kernel_main(multiboot_info_t* mbd, unsigned int magic)
     kassert(mbd->flags >> 6 & 1);
 
     kprintf("Yeah, this is big brain time.\n");
-    auto time = Time::RTC::now();
-    kprintf("RTC: ");
-    TTY::set_color(VGA::Color::LIGHT_GREY, VGA::Color::BLACK);
-    kprintf("%d/%d/%d at %d:%d:%d\n", time.day, time.month, time.year, time.hour, time.minute, time.second);
-    TTY::reset_color();
+    print_rtc();
 
     const auto memory_map_entry = find_best_memory(mbd);
     kprintf("End of kernel: ");
@@ -128,8 +142,6 @@ extern "C" void kernel_main(multiboot_info_t* mbd, unsigned int magic)
     initialize_memory_manager(memory_map_entry.address, memory_map_entry.length);
 
     auto cpuid = CPUID();
+    print_cpu_vendor(cpuid);
     print_all_cpu_features(cpuid);
-    (void)cpuid.vendor();
-
-    kassert_msg(false, "That's all we have to offer.");
 }

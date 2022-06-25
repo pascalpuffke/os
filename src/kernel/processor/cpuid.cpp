@@ -6,6 +6,8 @@
 #include <kernel/video/tty.h>
 #include <kernel/video/vga.h>
 
+#include <libc/string.h>
+
 namespace Kernel {
 
 // CPU vendor strings
@@ -47,16 +49,6 @@ void CPUID::get(CPUIDRequest request, u32 ecx)
                  : "a"(request), "c"(ecx));
 }
 
-static int strcmp(const char* a, const char* b)
-{
-    while (*a == *b)
-        if (*a == '\0')
-            return 0;
-        else
-            a++;
-    return *a - *b;
-}
-
 const char* CPUID::vendor()
 {
     get(CPUIDRequest::GET_VENDOR_STRING);
@@ -70,13 +62,42 @@ const char* CPUID::vendor()
         vendor[i + 8] = static_cast<char>(m_ecx >> (i * 8));
     vendor[12] = '\0';
 
-    kprintf("CPU vendor: ");
-    Kernel::TTY::set_color(Kernel::VGA::Color::LIGHT_GREY, Kernel::VGA::Color::BLACK);
-    kprintf("%s\n", vendor);
-    Kernel::TTY::reset_color();
+#define RETURN_VENDOR(str)        \
+    if (strcmp(vendor, str) == 0) \
+        return str;
 
-    // TODO
-    return nullptr;
+    RETURN_VENDOR(VENDOR_OLDAMD);
+    RETURN_VENDOR(VENDOR_AMD);
+    RETURN_VENDOR(VENDOR_INTEL);
+    RETURN_VENDOR(VENDOR_VIA);
+    RETURN_VENDOR(VENDOR_OLDTRANSMETA);
+    RETURN_VENDOR(VENDOR_TRANSMETA);
+    RETURN_VENDOR(VENDOR_CYRIX);
+    RETURN_VENDOR(VENDOR_CENTAUR);
+    RETURN_VENDOR(VENDOR_NEXGEN);
+    RETURN_VENDOR(VENDOR_UMC);
+    RETURN_VENDOR(VENDOR_SIS);
+    RETURN_VENDOR(VENDOR_NSC);
+    RETURN_VENDOR(VENDOR_RISE);
+    RETURN_VENDOR(VENDOR_VORTEX);
+    RETURN_VENDOR(VENDOR_OLDAO486);
+    RETURN_VENDOR(VENDOR_AO486);
+    RETURN_VENDOR(VENDOR_ZHAOXIN);
+    RETURN_VENDOR(VENDOR_HYGON);
+    RETURN_VENDOR(VENDOR_ELBRUS);
+    RETURN_VENDOR(VENDOR_QEMU);
+    RETURN_VENDOR(VENDOR_KVM);
+    RETURN_VENDOR(VENDOR_VMWARE);
+    RETURN_VENDOR(VENDOR_VIRTUALBOX);
+    RETURN_VENDOR(VENDOR_XEN);
+    RETURN_VENDOR(VENDOR_HYPERV);
+    RETURN_VENDOR(VENDOR_PARALLELS);
+    RETURN_VENDOR(VENDOR_PARALLELS_ALT);
+    RETURN_VENDOR(VENDOR_BHYVE);
+    RETURN_VENDOR(VENDOR_QNX);
+#undef RETURN_VENDOR
+
+    return "Unknown";
 }
 
 bool CPUID::has_feature(CPUFeature feature)
@@ -158,5 +179,4 @@ bool CPUID::has_feature(CPUFeature feature)
     }
 #undef FEATURE
 }
-
 }
