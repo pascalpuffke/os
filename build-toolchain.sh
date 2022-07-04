@@ -23,14 +23,6 @@ build_binutils() {
         echo -e "    \e[36mDownloading \e[0mbinutils-$BINUTILS_VERSION... "
         wget $url
         wget $signature_url
-
-        echo -ne "    \e[36mVerifying \e[0mbinutils-$BINUTILS_VERSION signature... "
-        gpg --verify binutils-$BINUTILS_VERSION.tar.xz.sig binutils-$BINUTILS_VERSION.tar.xz
-        if [ $? -ne 0 ]; then
-            echo -e "\e[31mfailed with return code $?.\e[0m"
-            exit 1
-        fi
-        echo "succeeded."
     fi
 
     if [ ! -d "binutils-$BINUTILS_VERSION" ]; then
@@ -56,14 +48,6 @@ build_gcc() {
         echo -e "    \e[36mDownloading \e[0mgcc-$GCC_VERSION... "
         wget $url
         wget $signature_url
-
-        echo -ne "    \e[36mVerifying \e[0mgcc-$GCC_VERSION signature... "
-        gpg --verify gcc-$GCC_VERSION.tar.xz.sig gcc-$GCC_VERSION.tar.xz
-        if [ $? -ne 0 ]; then
-            echo -e "\e[31mfailed with return code $?.\e[0m"
-            exit 1
-        fi
-        echo "succeeded."
     fi
 
     if [ ! -d "gcc-$GCC_VERSION" ]; then
