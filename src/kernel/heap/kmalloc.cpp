@@ -15,6 +15,9 @@ struct [[gnu::packed]] Block {
     u32 chunk;
 };
 
+// Zero-initialize all new blocks.
+static constexpr bool ZERO_MEMORY = true;
+
 // The heap is split into chunks of this size.
 static constexpr usize CHUNK_SIZE = 64;
 static constexpr usize POOL_SIZE = (4 * MiB);
@@ -44,7 +47,7 @@ void MemoryManager::initialize(u64 memory_start, u64 memory_size)
 void* MemoryManager::allocate(usize size)
 {
     Kernel::InterruptScope scope;
-    ++m_allocation_count;
+    m_allocation_count++;
 
     auto real_size = size + sizeof(Block);
     kassert_msg(m_free > real_size, "Ran out of memory. Oops!");
@@ -89,6 +92,9 @@ void* MemoryManager::allocate(usize size)
                 m_allocated += block->chunk * CHUNK_SIZE;
                 m_free -= block->chunk * CHUNK_SIZE;
 
+                if constexpr (ZERO_MEMORY)
+                    memset(pointer, 0, real_size);
+
                 return pointer;
             }
         }
@@ -116,11 +122,11 @@ void MemoryManager::free(void* ptr)
     kassert(is_kmalloc_address(ptr));
 
     Kernel::InterruptScope scope;
-    ++m_free_count;
+    m_free_count++;
 
     auto* block = reinterpret_cast<Block*>((usize)ptr - sizeof(Block));
 
-    for (auto i = block->start; i < block->start + block->chunk; ++i) {
+    for (auto i = block->start; i < block->start + block->chunk; i++) {
         bitmap[i / 8] &= ~(1 << (i % 8));
     }
 
