@@ -329,19 +329,6 @@ public:
     }
 
     /**
-     * Informs a BasicString object of a planned change in size, so that it can manage the storage allocation appropriately.
-     * @see https://en.cppreference.com/w/cpp/string/basic_string/reserve
-     * @param capacity new capacity of the string
-     */
-    constexpr void reserve(size_type new_cap)
-    {
-        // If new_cap is greater than the current capacity(), new storage is allocated, and capacity() is made equal or greater than new_cap.
-        if (new_cap > capacity())
-            grow(new_cap);
-        // If new_cap is less than or equal to the current capacity(), there is no effect.
-    }
-
-    /**
      * Returns the number of CharT elements in the string.
      * @see https://en.cppreference.com/w/cpp/string/basic_string/size
      * @return The number of CharT elements in the string.
@@ -362,6 +349,36 @@ public:
     }
 
     /**
+     * Returns the maximum number of elements the string is able to hold due to system or library implementation limitations.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/max_size
+     * @return Maximum number of characters.
+     */
+    constexpr size_type max_size() const
+    {
+        // TODO: Implement numeric_limits<size_type>
+        return 0x7FFFFFFF;
+    }
+
+    /**
+     * Informs a BasicString object of a planned change in size, so that it can manage the storage allocation appropriately.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/reserve
+     * @param capacity new capacity of the string
+     */
+    constexpr void reserve(size_type new_cap)
+    {
+        // If new_cap is greater than the current capacity(), new storage is allocated, and capacity() is made equal or greater than new_cap.
+        if (new_cap > capacity())
+            grow(new_cap);
+        // If new_cap is less than or equal to the current capacity(), there is no effect.
+    }
+
+    /**
+     * Returns the number of characters that the string has currently allocated space for.
+     * @return Capacity of the currently allocated storage, i.e. the storage available for storing elements.
+     */
+    constexpr size_type capacity() const { return m_capacity; }
+
+    /**
      * Requests the removal of unused capacity.
      * It is a non-binding request to reduce capacity() to size(). It depends on the implementation if the request is fulfilled.
      * If (and only if) reallocation takes place, all pointers, references, and iterators are invalidated.
@@ -373,12 +390,6 @@ public:
             grow(size());
     }
 
-    /**
-     * Returns the number of characters that the string has currently allocated space for.
-     * @return Capacity of the currently allocated storage, i.e. the storage available for storing elements.
-     */
-    constexpr size_type capacity() const { return m_capacity; }
-
     /// Operations
 
     /**
@@ -386,7 +397,13 @@ public:
      * All pointers, references, and iterators are invalidated.
      * @see https://en.cppreference.com/w/cpp/string/basic_string/clear
      */
-    constexpr void clear() { m_size = 0; }
+    constexpr void clear()
+    {
+        // Leave the capacity and the underlying data untouched.
+        for (size_type i = 0; i < capacity(); i++)
+            m_data[i] = CharT {};
+        m_size = 0;
+    }
 
     /**
      * Inserts a string, obtained by str.substr(index_str, count) at the position index
@@ -439,6 +456,25 @@ public:
         if (new_size > capacity())
             reserve(new_size);
         m_data[m_size++] = ch;
+
+        kassert(m_data[size()] == '\0');
+    }
+
+    constexpr void show_internal_data() const
+    {
+        if (size() == 0) {
+            kprintln("%p: (empty)", data());
+            return;
+        }
+
+        kprintf("%p: ", data());
+        for (size_type i = 0; i < capacity(); i++) {
+            auto ch = m_data[i] == '\0' ? '0' : m_data[i];
+            if (i == capacity() - 1)
+                kprintln("'%c'", ch);
+            else
+                kprintf("'%c', ", ch);
+        }
     }
 
     /**
@@ -487,7 +523,7 @@ public:
     }
 
     /**
-     * Appends another string.
+     * Appends another String.
      * @see https://en.cppreference.com/w/cpp/string/basic_string/append (2)
      * @param str string to append
      * @return reference to this string after appending
@@ -549,6 +585,114 @@ public:
     }
 
     /**
+     * Appends another String.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/operator+= (1)
+     * @param str string to append
+     * @return reference to this string after appending
+     */
+    constexpr BasicString& operator+=(const BasicString& str)
+    {
+        return append(str);
+    }
+
+    /**
+     * Appends a single character.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/operator+= (2)
+     * @param ch character to append
+     * @return reference to this string after appending
+     */
+    constexpr BasicString& operator+=(value_type ch)
+    {
+        push_back(ch);
+        return *this;
+    }
+
+    /**
+     * Appends the null-terminated character string pointed to by s.
+     * The length of the string is determined by the first null character.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/operator+= (3)
+     * @param s pointer to the character string to append
+     * @return reference to this string after appending
+     */
+    constexpr BasicString& operator+=(const_pointer s)
+    {
+        return append(s);
+    }
+
+    /**
+     * Checks if the String begins with the given prefix.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/starts_with (1)
+     * @param s another String
+     * @return true if the String begins with the provided prefix, false otherwise
+     */
+    // NOTE: the C++ standard wants me to use a basic_string_view param, but I have yet to implement that.
+    constexpr bool starts_with(const BasicString& str) const
+    {
+        return size() >= str.size() && memcmp(data(), str.data(), str.size()) == 0;
+    }
+
+    /**
+     * Checks if the String begins with the given character.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/starts_with (2)
+     * @param c a single character
+     * @return true if the String begins with the provided character, false otherwise
+     */
+    constexpr bool starts_with(value_type c) const
+    {
+        return size() > 0 && at(0) == c;
+    }
+
+    /**
+     * Checks if the String begins with the given prefix.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/starts_with (3)
+     * @param s a null-terminated character string
+     * @return true if the String begins with the provided prefix, false otherwise
+     */
+    constexpr bool starts_with(const_pointer s) const
+    {
+        return size() >= strlen(s) && memcmp(data(), s, strlen(s)) == 0;
+    }
+
+    /**
+     * Checks if the String ends with the given suffix.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/ends_with (1)
+     * @param s another String
+     * @return true if the String ends with the provided suffix, false otherwise
+     */
+    // NOTE: the C++ standard wants me to use a basic_string_view param, but I have yet to implement that.
+    constexpr bool ends_with(const BasicString& str) const
+    {
+        return size() >= str.size() && memcmp(data() + size() - str.size(), str.data(), str.size()) == 0;
+    }
+
+    /**
+     * Checks if the String ends with the given character.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/ends_with (2)
+     * @param c a single character
+     * @return true if the String ends with the provided character, false otherwise
+     */
+    constexpr bool ends_with(value_type c) const
+    {
+        return size() > 0 && at(size() - 1) == c;
+    }
+
+    /**
+     * Checks if the String ends with the given suffix.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/ends_with (3)
+     * @param s a null-terminated character string
+     * @return true if the String ends with the provided suffix, false otherwise
+     */
+    constexpr bool ends_with(const_pointer s) const
+    {
+        return size() >= strlen(s) && memcmp(data() + size() - strlen(s), s, strlen(s)) == 0;
+    }
+
+    constexpr bool contains(value_type c) const
+    {
+        return find(c) != npos;
+    }
+
+    /**
      * Exchanges the contents of the string with those of other.
      * @see https://en.cppreference.com/w/cpp/string/basic_string/swap
      * @param other string to exchange the contents with
@@ -563,10 +707,111 @@ public:
         *this = temp;
     }
 
+    /**
+     * Checks if the String contains the given substring.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/contains (1)
+     * @param str another String
+     * @return true if the string contains the substring, false otherwise
+     */
+    constexpr bool contains(const BasicString& str) const
+    {
+        return find(str) != npos;
+    }
+
+    /**
+     * Checks if the String contains the given character.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/contains (2)
+     * @param c A single character
+     * @return true if the string contains the character, false otherwise
+     */
+    constexpr bool contains(value_type c) const
+    {
+        return find(c) != npos;
+    }
+
+    /**
+     * Checks if the String contains the given substring.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/contains (3)
+     * @param s A null-terminated character string
+     * @return true if the string contains the substring, false otherwise
+     */
+    constexpr bool contains(const_pointer s) const
+    {
+        return find(s) != npos;
+    }
+
+    /// Search
+
+    /**
+     * Finds the first substring equal to str.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/find (1)
+     * @param str String to search for
+     * @param pos Position at which to start the search
+     * @return Position of the first character of the found substring or npos if no such substring is found
+     */
+    constexpr size_type find(const BasicString& str, size_type pos = 0) const
+    {
+        return find(str.data(), pos, str.size());
+    }
+
+    /**
+     * Finds the first substring equal to the range [s, s+count).
+     * This range may contain null characters.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/find (2)
+     * @param s Pointer to a character string to search for
+     * @param pos Position at which to start the search
+     * @param count Length of substring to search for
+     * @return Position of the first character of the found substring or npos if no such substring is found
+     */
+    constexpr size_type find(const_pointer s, size_type pos, size_type count) const
+    {
+        // a substring can be found only if pos <= size() - count
+        if (pos > size() - count)
+            return npos;
+
+        // search for the first character of s in the string
+        for (size_type i = pos; i < size(); i++) {
+            // if the first character of s is found, search for the rest of s in the string
+            if (at(i) == s[0]) {
+                // if the rest of s is found, return the position of the first character of s
+                if (memcmp(data() + i, s, count) == 0)
+                    return i;
+            }
+        }
+
+        return npos;
+    }
+
+    /**
+     * Finds the first substring equal to the character string pointed to by s.
+     * The length of the string is determined by the first null character.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/find (3)
+     * @param s Pointer to a character string to search for
+     * @param pos Position at which to start the search
+     * @return Position of the first character of the found substring or npos if no such substring is found
+     */
+    constexpr size_type find(const_pointer s, size_type pos = 0) const
+    {
+        return find(s, pos, strlen(s));
+    }
+
+    /**
+     * Finds the first character ch (treated as a single-character substring)
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/find (4)
+     * @param ch Character to search for
+     * @param pos Position at which to start the search
+     * @return Position of the first character of the found substring or npos if no such substring is found
+     */
+    constexpr size_type find(value_type ch, size_type pos = 0) const
+    {
+        return find(&ch, pos, 1);
+    }
+
 private:
     constexpr void grow(size_type new_capacity, size_type grow_factor = 2)
     {
         size_type optimal_cap = capacity();
+        // TODO: Allow shrinking, e.g. for shrink_to_fit to properly work.
         if (new_capacity <= optimal_cap)
             return;
 
@@ -595,6 +840,7 @@ private:
     constexpr void dispose()
     {
         m_allocator.deallocate(data(), capacity());
+        m_data = nullptr;
     }
 
     pointer m_data { nullptr };
