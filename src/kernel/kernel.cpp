@@ -11,8 +11,6 @@
 #include <kernel/video/tty.h>
 #include <kernel/video/vga.h>
 
-#include <stdlib/string.h>
-
 #if defined(__linux__)
 #error "Not using cross-compiler"
 #endif
@@ -21,20 +19,22 @@
 #error "Kernel needs to be compiled with a 32-bit x86 compiler"
 #endif
 
-#define KMUST(expr) ({                                                                                         \
-    auto result = (expr);                                                                                      \
-    if (!result) [[unlikely]] {                                                                                \
-        Kernel::TTY::set_color(Kernel::VGA::Color::LIGHT_RED, Kernel::VGA::Color::BLACK);                      \
-        kprintf("ASSERTION FAILED: %s\n      expression: %s\n         in file: %s:%d\n        function: %s\n", \
-            result.error().message(), #expr, __FILE__, __LINE__, __PRETTY_FUNCTION__);                         \
-        Kernel::hang();                                                                                        \
-    }                                                                                                          \
-    result;                                                                                                    \
+#define KMUST(expr) ({                                                                                        \
+    auto result = (expr);                                                                                     \
+    if (!result) [[unlikely]] {                                                                               \
+        Kernel::TTY::set_color(Kernel::VGA::Color::LIGHT_RED, Kernel::VGA::Color::BLACK);                     \
+        kprintln("ASSERTION FAILED: %s\n      expression: %s\n         in file: %s:%d\n        function: %s", \
+            result.error().message(), #expr, __FILE__, __LINE__, __PRETTY_FUNCTION__);                        \
+        Kernel::hang();                                                                                       \
+    }                                                                                                         \
+    result;                                                                                                   \
 })
 
 extern "C" u8 end_of_kernel_image[]; // Set by linker
 
 usize total_system_memory = 0;
+
+namespace Kernel {
 
 struct MemoryMapEntry {
     u64 address;
@@ -51,12 +51,12 @@ MemoryMapEntry find_best_memory(const multiboot_info_t* mbd)
 
         if (mmap->type == MULTIBOOT_MEMORY_AVAILABLE) {
             kprintf("Available memory: ");
-            Kernel::TTY::set_color(Kernel::VGA::Color::LIGHT_GREY, Kernel::VGA::Color::BLACK);
+            TTY::set_color(VGA::Color::LIGHT_GREY, VGA::Color::BLACK);
             // For some stupid reason these two have to be separated, or else
             // just one printf will always display 0x0 as the address.
             kprintf("%dK ", mmap->len / KiB);
-            kprintf("at 0x%X\n", mmap->addr);
-            Kernel::TTY::reset_color();
+            kprintln("at 0x%X", mmap->addr);
+            TTY::reset_color();
 
             total_system_memory += mmap->len;
 
@@ -84,37 +84,34 @@ void initialize_memory_manager(u64 extended_memory_start, u64 extended_memory_si
 
 void print_rtc()
 {
-    auto time = Kernel::Time::RTC::now();
+    auto time = Time::RTC::now();
     kprintf("RTC: ");
-    Kernel::TTY::set_color(Kernel::VGA::Color::LIGHT_GREY, Kernel::VGA::Color::BLACK);
-    kprintf("%d/%d/%d at %d:%d:%d\n", time.day, time.month, time.year, time.hour, time.minute, time.second);
-    Kernel::TTY::reset_color();
+    TTY::set_color(VGA::Color::LIGHT_GREY, VGA::Color::BLACK);
+    kprintln("%d/%d/%d at %d:%d:%d", time.day, time.month, time.year, time.hour, time.minute, time.second);
+    TTY::reset_color();
 }
 
-void print_all_cpu_features(Kernel::CPUID& cpuid)
-{
-    kprintf("CPU features: ");
-    Kernel::TTY::set_color(Kernel::VGA::Color::LIGHT_GREY, Kernel::VGA::Color::BLACK);
-
-    // Loop through all CPU features, check if the CPU has them, and print them.
-    for (usize i = 0; i < (usize)Kernel::CPUFeature::_LAST; i++) {
-        auto feature = (Kernel::CPUFeature)i;
-        if (cpuid.has_feature(feature)) {
-            kprintf("%s ", Kernel::cpu_feature_to_string(feature));
-        }
-    }
-
-    Kernel::TTY::reset_color();
-    kprintf("\n");
-}
-
-void print_cpu_vendor(Kernel::CPUID& cpuid)
+void print_cpu_info(CPUID& cpuid)
 {
     const auto* vendor = cpuid.vendor();
-    kprintf("CPU vendor: ");
-    Kernel::TTY::set_color(Kernel::VGA::Color::LIGHT_GREY, Kernel::VGA::Color::BLACK);
-    kprintf("%s\n", vendor);
-    Kernel::TTY::reset_color();
+    const auto info = cpuid.info();
+    kprintf("CPU: ");
+    TTY::set_color(VGA::Color::LIGHT_GREY, VGA::Color::BLACK);
+    kprintln("%s family %d model %d stepping %d type %d", vendor, info.family, info.model, info.stepping, info.type);
+    TTY::reset_color();
+
+    kprintf("CPU features: ");
+    TTY::set_color(VGA::Color::LIGHT_GREY, VGA::Color::BLACK);
+    for (usize i = 0; i < (usize)CPUFeature::_LAST; i++) {
+        auto feature = (CPUFeature)i;
+        if (cpuid.has_feature(feature)) {
+            kprintf("%s ", cpu_feature_to_string(feature));
+        }
+    }
+    TTY::reset_color();
+    kputchar('\n');
+}
+
 }
 
 extern "C" void kernel_main(multiboot_info_t* mbd, unsigned int magic)
@@ -129,18 +126,17 @@ extern "C" void kernel_main(multiboot_info_t* mbd, unsigned int magic)
     kassert(magic == MULTIBOOT_BOOTLOADER_MAGIC);
     kassert(mbd->flags >> 6 & 1);
 
-    kprintf("Yeah, this is big brain time.\n");
+    kprintln("Yeah, this is big brain time.");
     print_rtc();
+
+    auto cpuid = CPUID();
+    print_cpu_info(cpuid);
 
     const auto memory_map_entry = find_best_memory(mbd);
     kprintf("End of kernel: ");
     TTY::set_color(VGA::Color::LIGHT_GREY, VGA::Color::BLACK);
-    kprintf("0x%X (size: %dK)\n", end_of_kernel_image, ((usize)end_of_kernel_image - memory_map_entry.address) / KiB);
+    kprintln("0x%X (size: %dK)", end_of_kernel_image, ((usize)end_of_kernel_image - memory_map_entry.address) / KiB);
     TTY::reset_color();
 
     initialize_memory_manager(memory_map_entry.address, memory_map_entry.length);
-
-    auto cpuid = CPUID();
-    print_cpu_vendor(cpuid);
-    print_all_cpu_features(cpuid);
 }
