@@ -128,3 +128,13 @@ int kprintf(const char* format, ...)
     va_end(args);
     return ret;
 }
+
+int kprintln(const char* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    int ret = vkprintf(format, args);
+    va_end(args);
+    kputchar('\n');
+    return ret + 1;
+}
