@@ -5,8 +5,13 @@
 namespace Kernel {
 
 enum class CPUIDRequest {
-    GET_VENDOR_STRING = 0x00,
-    GET_FEATURES = 0x01,
+    GET_VENDOR_STRING = 0x00, // Highest Function Parameter and Manufacturer ID
+    GET_FEATURES = 0x01, // Processor Info and Feature Bits
+    GET_TLB_INFO = 0x02, // Cache and TLB Descriptor information
+    GET_SERIAL = 0x03, // Processor Serial Number (not supported on most CPUs)
+    GET_INTEL_TOPOLOGY = 0x04, // Intel thread/core and cache topology
+    GET_THERMAL_POWER_MGMT = 0x06, // Thermal and power management
+    GET_EXTENDED_FEATURES = 0x07, // Extended Features
 };
 
 enum class CPUFeature {
@@ -74,6 +79,21 @@ enum class CPUFeature {
     _LAST
 };
 
+enum class ProcessorType : u8 {
+    OEM = (1 << 0),
+    INTEL_OVERDRIVE = (1 << 1),
+    DUAL_PROCESSOR = (1 << 2),
+    RESERVED = (1 << 3),
+};
+
+// Used as a return value for CPUIDRequest::GET_FEATURES
+struct ProcessorInfo {
+    u32 stepping;
+    u32 model;
+    u32 family;
+    ProcessorType type;
+};
+
 static const char* cpu_feature_to_string(CPUFeature feature)
 {
     // dear god.
@@ -86,6 +106,7 @@ class CPUID final {
 public:
     const char* vendor();
     bool has_feature(CPUFeature);
+    ProcessorInfo info();
 
 private:
     u32 m_eax, m_ebx, m_ecx, m_edx;

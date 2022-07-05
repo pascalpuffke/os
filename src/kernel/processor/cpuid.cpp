@@ -1,7 +1,6 @@
 #include <kernel/processor/cpuid.h>
 
 #include <kernel/util/asm.h>
-#include <kernel/util/kprintf.h>
 
 #include <kernel/video/tty.h>
 #include <kernel/video/vga.h>
@@ -176,6 +175,34 @@ bool CPUID::has_feature(CPUFeature feature)
         return false;
     }
 #undef FEATURE
+}
+
+ProcessorInfo CPUID::info()
+{
+    get(CPUIDRequest::GET_FEATURES);
+
+    ProcessorInfo info {
+        .stepping = m_eax & 0x0F,
+        .model = (m_eax >> 4) & 0x0F,
+        .family = (m_eax >> 8) & 0x0F,
+        .type = static_cast<ProcessorType>((m_eax >> 12) & 0x03),
+    };
+    const auto extended_model = (m_eax >> 16) & 0x0F;
+    const auto extended_family = (m_eax >> 20) & 0xFF;
+
+    // The actual processor model is derived from the Model, Extended Model ID and Family ID fields.
+    // If the Family ID field is either 6 or 15, the model is equal to the sum of the Extended Model ID field shifted left by 4 bits and the Model field.
+    if (info.family == 6 || info.family == 15)
+        info.model += extended_model << 4;
+    // Otherwise, the model is equal to the value of the Model field.
+
+    // The actual processor family is derived from the Family ID and Extended Family ID fields.
+    // If the Family ID field is equal to 15, the family is equal to the sum of the Extended Family ID and the Family ID fields.
+    if (info.family == 15)
+        info.family += extended_family;
+    // Otherwise, the family is equal to value of the Family ID field.
+
+    return info;
 }
 
 }
