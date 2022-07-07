@@ -1,6 +1,5 @@
 #pragma once
 
-#include <kernel/heap/kmalloc.h>
 #include <libc/string.h>
 #include <stdlib/assert.h>
 #include <stdlib/memory/allocator.h>
@@ -190,7 +189,7 @@ public:
      */
     constexpr reference at(size_type pos)
     {
-        assert(pos < size());
+        expect(pos < size());
         return m_data[pos];
     }
 
@@ -203,7 +202,7 @@ public:
      */
     constexpr const_reference at(size_type pos) const
     {
-        assert(pos < size());
+        expect(pos < size());
         return m_data[pos];
     }
 
@@ -279,7 +278,7 @@ public:
      */
     constexpr reference front()
     {
-        assert(!empty());
+        expect(!empty());
         return m_data[0];
     }
 
@@ -290,7 +289,7 @@ public:
      */
     constexpr const_reference front() const
     {
-        assert(!empty());
+        expect(!empty());
         return m_data[0];
     }
 
@@ -301,7 +300,7 @@ public:
      */
     constexpr reference back()
     {
-        assert(!empty());
+        expect(!empty());
         return m_data[size() - 1];
     }
 
@@ -312,7 +311,7 @@ public:
      */
     constexpr const_reference back() const
     {
-        assert(!empty());
+        expect(!empty());
         return m_data[size() - 1];
     }
 
@@ -368,7 +367,7 @@ public:
     {
         // If new_cap is greater than the current capacity(), new storage is allocated, and capacity() is made equal or greater than new_cap.
         if (new_cap > capacity())
-            grow(new_cap);
+            grow(new_cap, true);
         // If new_cap is less than or equal to the current capacity(), there is no effect.
     }
 
@@ -416,8 +415,8 @@ public:
      */
     constexpr BasicString& insert(size_type index, const BasicString& str, size_type index_str, size_type count = npos)
     {
-        assert(index <= size());
-        assert(index_str <= str.length());
+        expect(index <= size());
+        expect(index_str <= str.length());
 
         auto sub_str = str.substr(index_str, count);
 
@@ -434,7 +433,7 @@ public:
      */
     constexpr BasicString& erase(size_type index = 0, size_type count = npos)
     {
-        assert(index <= size());
+        expect(index <= size());
         if (count == npos) {
             m_size = index;
             auto new_str = BasicString(m_data, index);
@@ -453,11 +452,10 @@ public:
     constexpr void push_back(value_type ch)
     {
         const auto new_size = size() + 1;
-        if (new_size > capacity())
-            reserve(new_size);
+        reserve(new_size);
         m_data[m_size++] = ch;
 
-        kassert(m_data[size()] == '\0');
+        assert(m_data[size()] == '\0');
     }
 
     constexpr void show_internal_data() const
@@ -484,7 +482,7 @@ public:
      */
     constexpr void pop_back()
     {
-        assert(size() > 0);
+        expect(size() > 0);
         erase(size() - 1);
     }
 
@@ -498,7 +496,7 @@ public:
      */
     constexpr BasicString substr(size_type pos = 0, size_type count = npos) const
     {
-        assert(pos <= size());
+        expect(pos <= size());
         const auto adjusted_count = count == npos ? size() - pos : count;
         return BasicString(m_data + pos, adjusted_count);
     }
@@ -544,8 +542,8 @@ public:
      */
     constexpr BasicString& append(const BasicString& str, size_type pos, size_type count = npos)
     {
-        assert(pos <= str.size());
-        assert(count == npos || pos + count <= str.size());
+        expect(pos <= str.size());
+        expect(count == npos || pos + count <= str.size());
         auto adjusted_count = count == npos ? str.size() - pos : count;
         reserve(size() + adjusted_count);
 
@@ -687,11 +685,6 @@ public:
         return size() >= strlen(s) && memcmp(data() + size() - strlen(s), s, strlen(s)) == 0;
     }
 
-    constexpr bool contains(value_type c) const
-    {
-        return find(c) != npos;
-    }
-
     /**
      * Exchanges the contents of the string with those of other.
      * @see https://en.cppreference.com/w/cpp/string/basic_string/swap
@@ -738,6 +731,92 @@ public:
     constexpr bool contains(const_pointer s) const
     {
         return find(s) != npos;
+    }
+
+    /**
+     * Replaces the part of the String indicated by [pos, pos + count) with a new String.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/replace (1)
+     * @param pos Start of the substring that is going to be replaced
+     * @param count Length of the substring that is going to be replaced
+     * @param str String to use for replacement
+     * @return reference to this String after replacement
+     */
+    constexpr BasicString& replace(size_type pos, size_type count, const BasicString& str)
+    {
+        return replace(pos, count, str, 0, str.size());
+    }
+
+    /**
+     * Replaces the part of the String indicated by [pos, pos + count) with a new String.
+     * The new string is a substring [pos2, pos2 + count2) of str, except if count2==npos or if would extend past str.size(), [pos2, str.size()) is used.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/replace (2)
+     * @param from Start of the substring that is going to be replaced
+     * @param count Length of the substring that is going to be replaced
+     * @param str String to use for replacement
+     * @param str_from Start of the substring to replace with
+     * @param str_len Number of characters to replace with
+     * @return reference to this String after replacement
+     */
+    constexpr BasicString& replace(size_type from, size_type count, const BasicString& str, size_type str_from, size_type str_len = npos)
+    {
+        expect(from <= length());
+        expect(str_from <= str.length());
+        return *this;
+    }
+
+    /**
+     * Replaces the part of the String indicated by [pos, pos + count) with a new String.
+     * @see https://en.cppreference.com/w/cpp/string/basic_string/replace (4)
+     * @param from Start of the substring that is going to be replaced
+     * @param count Length of the substring that is going to be replaced
+     * @param cstr Pointer to the character string to use for replacement
+     * @param cstr_len Number of characters to replace with
+     * @return reference to this String after replacement
+     */
+    constexpr BasicString& replace(size_type from, size_type count, const_pointer cstr, size_type cstr_len)
+    {
+        expect(from <= length());
+
+        const auto new_size = length() - count + cstr_len;
+        reserve(new_size);
+
+        if (from < length() - count)
+            move(from + count, length() - from - count, from);
+
+        fill(from, cstr_len, cstr);
+
+        return *this;
+    }
+
+    constexpr BasicString& replace(size_type from, size_type count, const_pointer cstr)
+    {
+        return replace(from, count, cstr, strlen(cstr));
+    }
+
+    constexpr BasicString& replace(size_type from, size_type count, size_type ch_count, value_type ch)
+    {
+        expect(from <= length());
+
+        if (ch_count == npos)
+            ch_count = length() - from;
+
+        if (ch_count == 0)
+            return *this;
+
+        if (ch_count == count) {
+            fill(from, ch_count, ch);
+            return *this;
+        }
+
+        const auto new_size = length() - count + ch_count;
+        reserve(new_size);
+
+        if (from < length() - count)
+            move(from + ch_count, length() - count - from, from);
+
+        fill(from, ch_count, ch);
+
+        return *this;
     }
 
     /// Search
@@ -808,20 +887,78 @@ public:
     }
 
 private:
-    constexpr void grow(size_type new_capacity, size_type grow_factor = 2)
+    /**
+     * Move a substring to a new position.
+     * This function will not grow the String.
+     * @param from Start of the substring to move
+     * @param count Length of the substring to move
+     * @param to Position to move the substring to
+     */
+    constexpr void move(size_type from, size_type count, size_type to)
+    {
+        expect(to + count <= capacity());
+        expect(from + count <= size());
+
+        if (from == to)
+            return;
+        if (from > to) {
+            for (size_type i = from; i > to; i--)
+                m_data[i] = m_data[i - count];
+        } else {
+            for (size_type i = from; i < to; i++)
+                m_data[i] = m_data[i + count];
+        }
+    }
+
+    /**
+     * Fill a substring with a character.
+     * This function will not grow the String.
+     * @param from Start of the substring to fill
+     * @param count Length of the substring to fill
+     * @param ch Character to fill the substring with
+     */
+    constexpr void fill(size_type from, size_type count, value_type ch)
+    {
+        expect(from <= size());
+        expect(from + count <= capacity());
+
+        for (size_type i = from; i < from + count; i++)
+            m_data[i] = ch;
+    }
+
+    /**
+     * Fill a substring with a character string.
+     * This function will not grow the String.
+     * @param from Start of the substring to fill
+     * @param count Length of the substring to fill
+     * @param cstr Pointer to a character string to fill the substring with
+     */
+    constexpr void fill(size_type from, size_type count, const_pointer cstr)
+    {
+        expect(from <= size());
+        expect(from + count <= capacity());
+
+        for (size_type i = from; i < from + count; i++)
+            m_data[i] = cstr[i - from];
+    }
+
+    constexpr void grow(size_type new_capacity, bool allow_shrinking = false, size_type grow_factor = 2)
     {
         size_type optimal_cap = capacity();
-        // TODO: Allow shrinking, e.g. for shrink_to_fit to properly work.
-        if (new_capacity <= optimal_cap)
+        if (new_capacity <= optimal_cap && !allow_shrinking)
             return;
 
-        // So we don't get stuck in the while loop
-        if (optimal_cap == 0)
-            optimal_cap = 1;
+        if (allow_shrinking) {
+            optimal_cap = new_capacity;
+        } else {
+            // So we don't get stuck in the while loop
+            if (optimal_cap == 0)
+                optimal_cap = 1;
 
-        // Double the capacity until it is large enough.
-        while (new_capacity > optimal_cap)
-            optimal_cap *= grow_factor;
+            // Multiply the optimal capacity by the growth factor until it is large enough
+            while (new_capacity > optimal_cap)
+                optimal_cap *= grow_factor;
+        }
 
         // Allocate a new buffer and copy the old data into it.
         auto new_buffer = m_allocator.allocate(optimal_cap);
