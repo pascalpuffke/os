@@ -7,15 +7,13 @@
 #include <stdlib/types.h>
 
 template <typename T>
-ALWAYS_INLINE void ref_if_nonnull(T* ptr)
-{
+ALWAYS_INLINE void ref_if_nonnull(T* ptr) {
     if (ptr)
         ptr->ref();
 }
 
 template <typename T>
-ALWAYS_INLINE void unref_if_nonnull(T* ptr)
-{
+ALWAYS_INLINE void unref_if_nonnull(T* ptr) {
     if (ptr)
         ptr->unref();
 }
@@ -32,38 +30,32 @@ public:
     constexpr SharedPtr() = default;
 
     constexpr SharedPtr(Type* ptr)
-        : m_ptr(ptr)
-    {
+        : m_ptr(ptr) {
         ref_if_nonnull(m_ptr);
     }
 
     constexpr SharedPtr(const SharedPtr& other)
-        : m_ptr(other.m_ptr)
-    {
+        : m_ptr(other.m_ptr) {
         m_ptr->ref();
     }
 
     constexpr SharedPtr(const UniquePtr<Type>& other)
-        : m_ptr(other.release())
-    {
+        : m_ptr(other.release()) {
         ref_if_nonnull(m_ptr);
     }
 
     template <typename... Args>
-    [[nodiscard]] static constexpr SharedPtr make(Args&&... args)
-    {
+    [[nodiscard]] static constexpr SharedPtr make(Args&&... args) {
         return SharedPtr(new Type(forward<Args>(args)...));
     }
 
-    constexpr void reset(Type* ptr = nullptr)
-    {
+    constexpr void reset(Type* ptr = nullptr) {
         unref_if_nonnull(m_ptr);
         m_ptr = ptr;
         ref_if_nonnull(m_ptr);
     }
 
-    constexpr void swap(SharedPtr& other)
-    {
+    constexpr void swap(SharedPtr& other) {
         auto tmp = m_ptr;
         m_ptr = other.m_ptr;
         other.m_ptr = tmp;

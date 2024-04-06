@@ -16,8 +16,7 @@ public:
 
     constexpr initializer_list() noexcept
         : m_data(nullptr)
-        , m_size(0)
-    {
+        , m_size(0) {
     }
 
     constexpr size_type size() const noexcept { return m_size; }
@@ -28,8 +27,7 @@ public:
 private:
     constexpr initializer_list(const T* data, size_type size) noexcept
         : m_data(data)
-        , m_size(size)
-    {
+        , m_size(size) {
     }
 
     const T* m_data { nullptr };
@@ -41,7 +39,5 @@ inline constexpr const T* begin(initializer_list<T> il) noexcept { return il.beg
 
 template <typename T>
 inline constexpr const T* end(initializer_list<T> il) noexcept { return il.end(); }
-}
 
-template <typename T>
-using InitializerList = std::initializer_list<T>;
+}

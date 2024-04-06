@@ -12,7 +12,7 @@
  * {
  *     auto ptr = UniquePtr<int>::make(41);
  *     (*ptr)++;
- *     kassert(*ptr == 42);
+ *     assert(*ptr == 42);
  * }
  * @encode
  * @tparam T The type of the resource.
@@ -22,79 +22,66 @@ class UniquePtr final {
 public:
     constexpr UniquePtr() = default;
     constexpr UniquePtr(T* ptr)
-        : m_ptr(ptr)
-    {
+        : m_ptr(ptr) {
     }
 
     template <typename U>
     constexpr UniquePtr(U* ptr)
-        : m_ptr(ptr)
-    {
+        : m_ptr(ptr) {
     }
 
     constexpr UniquePtr(UniquePtr&& other)
-        : m_ptr(other.release())
-    {
+        : m_ptr(other.release()) {
     }
 
     template <typename... Args>
-    [[nodiscard]] static constexpr UniquePtr make(Args&&... args)
-    {
+    [[nodiscard]] static constexpr UniquePtr make(Args&&... args) {
         return UniquePtr(new T(forward<Args>(args)...));
     }
 
     constexpr UniquePtr(const UniquePtr&) = delete;
     constexpr UniquePtr& operator=(const UniquePtr&) = delete;
 
-    constexpr ~UniquePtr()
-    {
+    constexpr ~UniquePtr() {
         reset();
     }
 
-    constexpr UniquePtr& operator=(UniquePtr&& other)
-    {
+    constexpr UniquePtr& operator=(UniquePtr&& other) {
         reset(other.release());
         return *this;
     }
 
-    constexpr T* release()
-    {
+    constexpr T* release() {
         T* ptr = m_ptr;
         m_ptr = nullptr;
         return ptr;
     }
 
-    constexpr void reset(T* ptr = nullptr)
-    {
+    constexpr void reset(T* ptr = nullptr) {
         if (m_ptr)
             delete m_ptr;
         m_ptr = ptr;
     }
 
-    constexpr void swap(UniquePtr& other)
-    {
+    constexpr void swap(UniquePtr& other) {
         T* ptr = m_ptr;
         m_ptr = other.m_ptr;
         other.m_ptr = ptr;
     }
 
-    constexpr T* get() const
-    {
+    constexpr T* get() const {
         return m_ptr;
     }
 
-    constexpr operator bool() const
-    {
+    constexpr operator bool() const {
         return m_ptr != nullptr;
     }
 
-    constexpr T& operator*() const
-    {
+    constexpr T& operator*() const {
         return *m_ptr;
     }
 
-    constexpr T* operator->() const
-    {
+    constexpr T* operator->() const {
         return m_ptr;
     }
 

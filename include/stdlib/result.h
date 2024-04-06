@@ -1,8 +1,5 @@
 #pragma once
 
-#ifdef KERNEL
-#include <kernel/util/kassert.h>
-#endif
 #include <stdlib/optional.h>
 
 /**
@@ -16,16 +13,14 @@ public:
      * Constructs an empty Error, setting its internal message to `nullptr`.
      */
     constexpr Error()
-        : m_message(nullptr)
-    {
+        : m_message() {
     }
     /**
      * Constructs an Error with the given message.
      * @param message The message to set.
      */
-    constexpr Error(const char* message)
-        : m_message(message)
-    {
+    constexpr explicit Error(const char* message)
+        : m_message(message) {
     }
 
     constexpr Error(const Error&) = default;
@@ -38,11 +33,11 @@ public:
     constexpr bool operator!=(const Error& other) const { return !(*this == other); }
 
     /**
-     * @brief Returns the message of this Error.
+     * @brief Returns the possibly empty message of this Error.
      *
-     * @return The message of this Error, or `nullptr` if this Error is empty.
+     * @return The message of this Error
      */
-    constexpr const char* message() const { return m_message; }
+    [[nodiscard]] constexpr const char* message() const { return m_message; }
 
 private:
     const char* m_message;
@@ -55,41 +50,40 @@ private:
  * // Example usage:
  * Result<int> res = 10;
  * const auto number = res
- *                        .and_then([](auto x) { return x * 2; })
- *                        .and_then([](auto x) { return x + 49; })
- *                        .or_else([](auto e) { kprintf("Error: %s\n", e.message()); return 0; })
+ *                        .map([](auto x) { return x * 2; })
+ *                        .map([](auto x) { return x + 49; })
+ *                        .or_else([](auto e) { kprintln("Error: %s", e.message()); return 0; })
  *                        .value();
- * printf("Result: %d\n", number); // Prints "Result: 69"
+ * println("Result: %d", number); // Prints "Result: 69"
  * @endcode
  */
 template <typename T, typename E = Error>
 class Result final {
 public:
-    constexpr Result(const T& value)
-        : m_value(value)
-    {
+    constexpr explicit(false) Result(const T& value)
+        : m_value(value) {
     }
-    constexpr Result(const E& error)
-        : m_error(error)
-    {
+    constexpr explicit(false) Result(const E& error)
+        : m_error(error) {
     }
 
     constexpr Result(const Result& other) = default;
-    constexpr Result(Result&& other) = default;
+    constexpr Result(Result&& other) noexcept = default;
 
     constexpr Result& operator=(const Result& other) = default;
-    constexpr Result& operator=(Result&& other) = default;
+    constexpr Result& operator=(Result&& other) noexcept = default;
 
-    constexpr bool operator==(const Result& other) const
-    {
+    constexpr bool operator==(const Result& other) const {
         if (m_value.has_value() && other.m_value.has_value())
             return m_value.value() == other.m_value.value();
         return m_error.value() == other.m_error.value();
     }
-    constexpr bool operator!=(const Result& other) const { return !(*this == other); }
+
+    constexpr bool operator!=(const Result& other) const { return *this != other; }
 
     [[nodiscard]] constexpr bool has_value() const { return m_value.has_value(); }
     [[nodiscard]] constexpr bool has_error() const { return m_error.has_value(); }
+
     /**
      * Returns whether this Result holds a value.
      * @see has_value()
@@ -104,11 +98,8 @@ public:
      *       it will panic.
      * @return The value of this Result.
      */
-    [[nodiscard]] constexpr T& value()
-    {
-#ifdef KERNEL
-        kassert_msg(has_value(), "Result::value() called on empty Result");
-#endif
+    [[nodiscard]] constexpr T& value() {
+        CONSTEXPR_AWARE_ASSERT(has_value());
         return m_value.value();
     }
 
@@ -119,11 +110,8 @@ public:
      *       it will panic.
      * @return The value of this Result.
      */
-    [[nodiscard]] constexpr const T& value() const
-    {
-#ifdef KERNEL
-        kassert_msg(has_value(), "Result::value() called on empty Result");
-#endif
+    [[nodiscard]] constexpr const T& value() const {
+        CONSTEXPR_AWARE_ASSERT(has_value());
         return m_value.value();
     }
 
@@ -134,11 +122,8 @@ public:
      *       it will panic.
      * @return The error of this Result.
      */
-    [[nodiscard]] constexpr E& error()
-    {
-#ifdef KERNEL
-        kassert_msg(has_error(), "Result::error() called on empty Result");
-#endif
+    [[nodiscard]] constexpr E& error() {
+        CONSTEXPR_AWARE_ASSERT(has_error());
         return m_error.value();
     }
 
@@ -149,11 +134,8 @@ public:
      *       it will panic.
      * @return The error of this Result.
      */
-    [[nodiscard]] constexpr const E& error() const
-    {
-#ifdef KERNEL
-        kassert_msg(has_error(), "Result::error() called on empty Result");
-#endif
+    [[nodiscard]] constexpr const E& error() const {
+        CONSTEXPR_AWARE_ASSERT(has_error());
         return m_error.value();
     }
 
@@ -163,6 +145,7 @@ public:
      * @return The value type if it is present, falling back to the default value otherwise.
      */
     [[nodiscard]] constexpr T& value_or(T& default_value) { return has_value() ? value() : default_value; }
+
     /**
      * Returns the value of this Result or the given default value if this Result holds an error.
      * @param default_value The default value to return if this Result is empty.
@@ -184,8 +167,7 @@ public:
      * @return A new Result with the transformed value type if it is present, otherwise with the error of this Result.
      */
     template <typename F>
-    [[nodiscard]] constexpr Result<T, E> map(F&& f) const
-    {
+    [[nodiscard]] constexpr Result<T, E> map(F&& f) const {
         if (has_value())
             return Result<T, E>(f(m_value.value()));
         return Result<T, E>(m_error.value());
@@ -197,40 +179,38 @@ public:
      * @return A new Result with the transformed error type if it is present, otherwise with the error of this Result.
      */
     template <typename F>
-    [[nodiscard]] constexpr Result<T, E> or_else(F&& f) const
-    {
+    [[nodiscard]] constexpr Result<T, E> or_else(F&& f) const {
         if (has_value())
             return Result<T, E>(m_value.value());
         return f(m_error.value());
     }
 
 private:
-    Optional<T> m_value {};
-    Optional<E> m_error {};
+    Optional<T> m_value = Optional<T>::empty();
+    Optional<E> m_error = Optional<E>::empty();
 };
 
 template <typename E>
 class Result<void, E> final {
 public:
-    constexpr Result() { }
+    constexpr Result() = default;
     constexpr Result(const E& error)
-        : m_error(error)
-    {
+        : m_error(error) {
     }
 
     constexpr Result(const Result& other) = default;
-    constexpr Result(Result&& other) = default;
+    constexpr Result(Result&& other) noexcept = default;
 
     constexpr Result& operator=(const Result& other) = default;
-    constexpr Result& operator=(Result&& other) = default;
+    constexpr Result& operator=(Result&& other) noexcept = default;
 
-    constexpr bool operator==(const Result& other) const
-    {
+    constexpr bool operator==(const Result& other) const {
         if (other.has_value())
             return false;
         return error() == other.error();
     }
-    constexpr bool operator!=(const Result& other) const { return !(*this == other); }
+
+    constexpr bool operator!=(const Result& other) const { return *this != other; }
 
     [[nodiscard]] constexpr bool has_error() const { return m_error.has_value(); }
     [[nodiscard]] constexpr bool has_value() const { return !has_error(); }
@@ -238,21 +218,16 @@ public:
 
     constexpr void value() { }
 
-    [[nodiscard]] constexpr E& error()
-    {
-#ifdef KERNEL
-        kassert_msg(has_error(), "Result::error() called on empty Result");
-#endif
+    [[nodiscard]] constexpr E& error() {
+        CONSTEXPR_AWARE_ASSERT(has_error());
         return m_error.value();
     }
-    [[nodiscard]] constexpr const E& error() const
-    {
-#ifdef KERNEL
-        kassert_msg(has_error(), "Result::error() called on empty Result");
-#endif
+
+    [[nodiscard]] constexpr const E& error() const {
+        CONSTEXPR_AWARE_ASSERT(has_error());
         return m_error.value();
     }
 
 private:
-    Optional<E> m_error {};
+    Optional<E> m_error = Optional<E>::empty();
 };

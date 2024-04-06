@@ -1,29 +1,32 @@
 #pragma once
 
-#include <libc/string.h>
-#include <stdlib/assert.h>
+#include <stdlib/constexpr_util.h>
 #include <stdlib/memory/allocator.h>
 #include <stdlib/move.h>
 #include <stdlib/traits.h>
 
+/**
+ * @brief Owned String-type with various mutating functionality and resizing
+ *
+ * @tparam CharT
+ * @tparam Allocator
+ */
 template <typename CharT, class Allocator = allocator<CharT>>
 class BasicString final {
 public:
     using value_type = CharT;
     using allocator_type = Allocator;
-    using size_type = Allocator::size_type;
-    using difference_type = Allocator::difference_type;
+    using size_type = typename Allocator::size_type;
+    using difference_type = typename Allocator::difference_type;
     using reference = value_type&;
     using const_reference = const value_type&;
-    using pointer = Allocator::pointer;
-    using const_pointer = Allocator::const_pointer;
+    using pointer = typename Allocator::pointer;
+    using const_pointer = typename Allocator::const_pointer;
 
     static const size_type npos = size_type(-1);
 
-    ~BasicString()
-    {
-        if (m_data)
-            dispose();
+    constexpr ~BasicString() {
+        dispose();
     }
 
     /**
@@ -33,8 +36,7 @@ public:
      * @see https://en.cppreference.com/w/cpp/string/basic_string/basic_string (1)
      */
     constexpr BasicString()
-        : m_allocator(allocator_type())
-    {
+        : m_allocator(allocator_type()) {
     }
 
     /**
@@ -44,8 +46,7 @@ public:
      * @param ch character to copy
      */
     constexpr BasicString(size_type count, value_type ch)
-        : m_allocator(allocator_type())
-    {
+        : m_allocator(allocator_type()) {
         assign(count, ch);
     }
 
@@ -58,8 +59,7 @@ public:
      * @param count size of the resulting string
      */
     constexpr BasicString(const BasicString& other, size_type pos, size_type count)
-        : m_allocator(allocator_type())
-    {
+        : m_allocator(allocator_type()) {
         assign(other, pos, count);
     }
 
@@ -73,8 +73,7 @@ public:
      * @param count size of the resulting string
      */
     constexpr BasicString(const_pointer s, size_type count)
-        : m_allocator(allocator_type())
-    {
+        : m_allocator(allocator_type()) {
         assign(s, count);
     }
 
@@ -85,8 +84,7 @@ public:
      * @param s pointer to an array of characters to use as source to initialize the string with
      * */
     constexpr BasicString(const_pointer s)
-        : m_allocator(allocator_type())
-    {
+        : m_allocator(allocator_type()) {
         assign(s);
     }
 
@@ -97,11 +95,10 @@ public:
      * @param ch value to initialize characters of the string with
      * @return *this with replaced contents
      */
-    constexpr BasicString& assign(size_type count, value_type ch)
-    {
+    constexpr BasicString& assign(size_type count, value_type ch) {
         reserve(count);
         m_size = count;
-        memset(m_data, ch, count);
+        cmptime::memset(m_data, ch, count);
 
         return *this;
     }
@@ -112,10 +109,7 @@ public:
      * @param str string to be used as source to initialize the characters with
      * @return *this with replaced contents
      */
-    constexpr BasicString& assign(const BasicString& str)
-    {
-        return assign(str.data(), str.size());
-    }
+    constexpr BasicString& assign(const BasicString& str) { return assign(str.data(), str.size()); }
 
     /**
      * Replaces the contents with a substring [pos, pos+count) of str.
@@ -126,8 +120,7 @@ public:
      * @param count size of the resulting string
      * @return *this with replaced contents
      */
-    constexpr BasicString& assign(const BasicString& str, size_type pos, size_type count = npos)
-    {
+    constexpr BasicString& assign(const BasicString& str, size_type pos, size_type count = npos) {
         const auto adjusted_count = count == npos ? str.size() - pos : count;
         return assign(str.data() + pos, adjusted_count);
     }
@@ -138,8 +131,7 @@ public:
      * @param str string to be used as source to initialize the characters with
      * @return *this with replaced contents
      */
-    constexpr BasicString& assign(BasicString&& str)
-    {
+    constexpr BasicString& assign(BasicString&& str) {
         m_data = str.m_data;
         m_capacity = str.m_capacity;
         m_size = str.m_size;
@@ -158,11 +150,10 @@ public:
      * @param count size of the resulting string
      * @return *this with replaced contents
      */
-    constexpr BasicString& assign(const_pointer s, size_type count)
-    {
+    constexpr BasicString& assign(const_pointer s, size_type count) {
         reserve(count);
         m_size = count;
-        memcpy(m_data, s, count);
+        cmptime::memcpy(m_data, s, count);
 
         return *this;
     }
@@ -173,10 +164,7 @@ public:
      * @param s pointer to a character string to use as source to initialize the string with
      * @return *this with replaced contents
      */
-    constexpr BasicString& assign(const_pointer s)
-    {
-        return assign(s, strlen(s));
-    }
+    constexpr BasicString& assign(const_pointer s) { return assign(s, cmptime::strlen(s)); }
 
     /// Element access
 
@@ -187,9 +175,8 @@ public:
      * @param pos position of the character to return
      * @return Reference to the requested character.
      */
-    constexpr reference at(size_type pos)
-    {
-        expect(pos < size());
+    constexpr reference at(size_type pos) {
+        CONSTEXPR_AWARE_ASSERT(pos < size());
         return m_data[pos];
     }
 
@@ -200,9 +187,8 @@ public:
      * @param pos position of the character to return
      * @return Reference to the requested character.
      */
-    constexpr const_reference at(size_type pos) const
-    {
-        expect(pos < size());
+    constexpr const_reference at(size_type pos) const {
+        CONSTEXPR_AWARE_ASSERT(pos < size());
         return m_data[pos];
     }
 
@@ -212,8 +198,7 @@ public:
      * @param pos position of the character to return
      * @return Mutable reference to the requested character.
      */
-    constexpr reference operator[](size_type pos)
-    {
+    constexpr reference operator[](size_type pos) {
         // If pos == size(), a reference to the character with value CharT() (the null character) is returned.
         if (pos == size())
             return CharT();
@@ -226,8 +211,7 @@ public:
      * @param pos position of the character to return
      * @return Immutable reference to the requested character.
      */
-    constexpr const_reference operator[](size_type pos) const
-    {
+    constexpr const_reference operator[](size_type pos) const {
         // If pos == size(), a reference to the character with value CharT() (the null character) is returned.
         if (pos == size())
             return CharT();
@@ -242,10 +226,7 @@ public:
      * @see https://en.cppreference.com/w/cpp/string/basic_string/data
      * @return A pointer to the underlying character storage.
      */
-    constexpr pointer data()
-    {
-        return m_data;
-    }
+    constexpr pointer data() { return m_data; }
 
     /**
      * @brief Returns a const pointer to the underlying array serving as character storage.
@@ -255,10 +236,7 @@ public:
      * @see https://en.cppreference.com/w/cpp/string/basic_string/data
      * @return A const pointer to the underlying character storage.
      */
-    constexpr const_pointer data() const
-    {
-        return m_data;
-    }
+    constexpr const_pointer data() const { return m_data; }
 
     /**
      * Returns a pointer to a null-terminated character array with data equivalent to those stored in the string.
@@ -266,19 +244,15 @@ public:
      * @see https://en.cppreference.com/w/cpp/string/basic_string/c_str
      * @return Pointer to the underlying character storage.
      */
-    constexpr const_pointer c_str() const
-    {
-        return m_data;
-    }
+    constexpr const_pointer c_str() const { return m_data; }
 
     /**
      * Returns a mutable reference to the first character in the string.
      * @see https://en.cppreference.com/w/cpp/string/basic_string/front
      * @return mutable reference to the first character, equivalent to operator[](0).
      */
-    constexpr reference front()
-    {
-        expect(!empty());
+    constexpr reference front() {
+        CONSTEXPR_AWARE_ASSERT(!empty());
         return m_data[0];
     }
 
@@ -287,9 +261,8 @@ public:
      * @see https://en.cppreference.com/w/cpp/string/basic_string/front
      * @return immutable reference to the first character, equivalent to operator[](0).
      */
-    constexpr const_reference front() const
-    {
-        expect(!empty());
+    constexpr const_reference front() const {
+        CONSTEXPR_AWARE_ASSERT(!empty());
         return m_data[0];
     }
 
@@ -298,9 +271,8 @@ public:
      * @see https://en.cppreference.com/w/cpp/string/basic_string/back
      * @return mutable reference to the first character, equivalent to operator[](size() - 1).
      */
-    constexpr reference back()
-    {
-        expect(!empty());
+    constexpr reference back() {
+        CONSTEXPR_AWARE_ASSERT(!empty());
         return m_data[size() - 1];
     }
 
@@ -309,9 +281,8 @@ public:
      * @see https://en.cppreference.com/w/cpp/string/basic_string/back
      * @return immutable reference to the first character, equivalent to operator[](size() - 1).
      */
-    constexpr const_reference back() const
-    {
-        expect(!empty());
+    constexpr const_reference back() const {
+        CONSTEXPR_AWARE_ASSERT(!empty());
         return m_data[size() - 1];
     }
 
@@ -322,38 +293,28 @@ public:
      * @see https://en.cppreference.com/w/cpp/string/basic_string/empty
      * @return true if the string is empty, false otherwise
      */
-    [[nodiscard]] constexpr bool empty() const
-    {
-        return size() == 0;
-    }
+    [[nodiscard]] constexpr bool empty() const { return size() == 0; }
 
     /**
      * Returns the number of CharT elements in the string.
      * @see https://en.cppreference.com/w/cpp/string/basic_string/size
      * @return The number of CharT elements in the string.
      */
-    constexpr size_type size() const
-    {
-        return m_size;
-    }
+    constexpr size_type size() const { return m_size; }
 
     /**
      * Returns the number of CharT elements in the string.
      * @see https://en.cppreference.com/w/cpp/string/basic_string/size
      * @return The number of CharT elements in the string.
      */
-    constexpr size_type length() const
-    {
-        return m_size;
-    }
+    constexpr size_type length() const { return m_size; }
 
     /**
      * Returns the maximum number of elements the string is able to hold due to system or library implementation limitations.
      * @see https://en.cppreference.com/w/cpp/string/basic_string/max_size
      * @return Maximum number of characters.
      */
-    constexpr size_type max_size() const
-    {
+    constexpr size_type max_size() const {
         // TODO: Implement numeric_limits<size_type>
         return 0x7FFFFFFF;
     }
@@ -363,13 +324,7 @@ public:
      * @see https://en.cppreference.com/w/cpp/string/basic_string/reserve
      * @param capacity new capacity of the string
      */
-    constexpr void reserve(size_type new_cap)
-    {
-        // If new_cap is greater than the current capacity(), new storage is allocated, and capacity() is made equal or greater than new_cap.
-        if (new_cap > capacity())
-            grow(new_cap, true);
-        // If new_cap is less than or equal to the current capacity(), there is no effect.
-    }
+    constexpr void reserve(size_type new_cap) { grow(new_cap, false); }
 
     /**
      * Returns the number of characters that the string has currently allocated space for.
@@ -383,11 +338,7 @@ public:
      * If (and only if) reallocation takes place, all pointers, references, and iterators are invalidated.
      * @see https://en.cppreference.com/w/cpp/string/basic_string/shrink_to_fit
      */
-    constexpr void shrink_to_fit()
-    {
-        if (capacity() > size())
-            grow(size());
-    }
+    constexpr void shrink_to_fit() { grow(size(), true); }
 
     /// Operations
 
@@ -396,8 +347,7 @@ public:
      * All pointers, references, and iterators are invalidated.
      * @see https://en.cppreference.com/w/cpp/string/basic_string/clear
      */
-    constexpr void clear()
-    {
+    constexpr void clear() {
         // Leave the capacity and the underlying data untouched.
         for (size_type i = 0; i < capacity(); i++)
             m_data[i] = CharT {};
@@ -413,10 +363,9 @@ public:
      * @param count number of characters to insert
      * @return *this
      */
-    constexpr BasicString& insert(size_type index, const BasicString& str, size_type index_str, size_type count = npos)
-    {
-        expect(index <= size());
-        expect(index_str <= str.length());
+    constexpr BasicString& insert(size_type index, const BasicString& str, size_type index_str, size_type count = npos) {
+        CONSTEXPR_AWARE_ASSERT(index <= size());
+        CONSTEXPR_AWARE_ASSERT(index_str <= str.length());
 
         auto sub_str = str.substr(index_str, count);
 
@@ -431,9 +380,8 @@ public:
      * @param count number of characters to remove
      * @return *this
      */
-    constexpr BasicString& erase(size_type index = 0, size_type count = npos)
-    {
-        expect(index <= size());
+    constexpr BasicString& erase(size_type index = 0, size_type count = npos) {
+        CONSTEXPR_AWARE_ASSERT(index <= size());
         if (count == npos) {
             m_size = index;
             auto new_str = BasicString(m_data, index);
@@ -449,8 +397,7 @@ public:
      * @see https://en.cppreference.com/w/cpp/string/basic_string/push_back
      * @param ch the character to append
      */
-    constexpr void push_back(value_type ch)
-    {
+    constexpr void push_back(value_type ch) {
         const auto new_size = size() + 1;
         reserve(new_size);
         m_data[m_size++] = ch;
@@ -458,8 +405,7 @@ public:
         assert(m_data[size()] == '\0');
     }
 
-    constexpr void show_internal_data() const
-    {
+    constexpr void show_internal_data() const {
         if (size() == 0) {
             kprintln("%p: (empty)", data());
             return;
@@ -480,9 +426,8 @@ public:
      * Equivalent to erase(end()-1).
      * @see https://en.cppreference.com/w/cpp/string/basic_string/pop_back
      */
-    constexpr void pop_back()
-    {
-        expect(size() > 0);
+    constexpr void pop_back() {
+        CONSTEXPR_AWARE_ASSERT(size() > 0);
         erase(size() - 1);
     }
 
@@ -494,9 +439,8 @@ public:
      * @param count length of the substring
      * @return String containing the substring [pos, pos+count) or [pos, size()).
      */
-    constexpr BasicString substr(size_type pos = 0, size_type count = npos) const
-    {
-        expect(pos <= size());
+    constexpr BasicString substr(size_type pos = 0, size_type count = npos) const {
+        CONSTEXPR_AWARE_ASSERT(pos <= size());
         const auto adjusted_count = count == npos ? size() - pos : count;
         return BasicString(m_data + pos, adjusted_count);
     }
@@ -508,8 +452,7 @@ public:
      * @param ch character value to append
      * @return reference to this string after appending
      */
-    constexpr BasicString& append(size_type count, value_type ch)
-    {
+    constexpr BasicString& append(size_type count, value_type ch) {
         if (count == 0)
             return *this;
         reserve(size() + count);
@@ -526,10 +469,7 @@ public:
      * @param str string to append
      * @return reference to this string after appending
      */
-    constexpr BasicString& append(const BasicString& str)
-    {
-        return append(str.data(), str.size());
-    }
+    constexpr BasicString& append(const BasicString& str) { return append(str.data(), str.size()); }
 
     /**
      * Appends a substring [pos, pos+count) of str.
@@ -540,10 +480,9 @@ public:
      * @param count number of characters to append
      * @return reference to this string after appending
      */
-    constexpr BasicString& append(const BasicString& str, size_type pos, size_type count = npos)
-    {
-        expect(pos <= str.size());
-        expect(count == npos || pos + count <= str.size());
+    constexpr BasicString& append(const BasicString& str, size_type pos, size_type count = npos) {
+        CONSTEXPR_AWARE_ASSERT(pos <= str.size());
+        CONSTEXPR_AWARE_ASSERT(count == npos || pos + count <= str.size());
         auto adjusted_count = count == npos ? str.size() - pos : count;
         reserve(size() + adjusted_count);
 
@@ -561,8 +500,7 @@ public:
      * @param count number of characters to append
      * @return reference to this string after appending
      */
-    constexpr BasicString& append(const_pointer s, size_type count)
-    {
+    constexpr BasicString& append(const_pointer s, size_type count) {
         reserve(size() + count);
         for (size_type i = 0; i < count; ++i)
             push_back(s[i]);
@@ -577,10 +515,7 @@ public:
      * @param s pointer to the character string to append
      * @return reference to this string after appending
      */
-    constexpr BasicString& append(const_pointer s)
-    {
-        return append(s, strlen(s));
-    }
+    constexpr BasicString& append(const_pointer s) { return append(s, cmptime::strlen(s)); }
 
     /**
      * Appends another String.
@@ -588,10 +523,7 @@ public:
      * @param str string to append
      * @return reference to this string after appending
      */
-    constexpr BasicString& operator+=(const BasicString& str)
-    {
-        return append(str);
-    }
+    constexpr BasicString& operator+=(const BasicString& str) { return append(str); }
 
     /**
      * Appends a single character.
@@ -599,8 +531,7 @@ public:
      * @param ch character to append
      * @return reference to this string after appending
      */
-    constexpr BasicString& operator+=(value_type ch)
-    {
+    constexpr BasicString& operator+=(value_type ch) {
         push_back(ch);
         return *this;
     }
@@ -612,10 +543,7 @@ public:
      * @param s pointer to the character string to append
      * @return reference to this string after appending
      */
-    constexpr BasicString& operator+=(const_pointer s)
-    {
-        return append(s);
-    }
+    constexpr BasicString& operator+=(const_pointer s) { return append(s); }
 
     /**
      * Checks if the String begins with the given prefix.
@@ -624,10 +552,7 @@ public:
      * @return true if the String begins with the provided prefix, false otherwise
      */
     // NOTE: the C++ standard wants me to use a basic_string_view param, but I have yet to implement that.
-    constexpr bool starts_with(const BasicString& str) const
-    {
-        return size() >= str.size() && memcmp(data(), str.data(), str.size()) == 0;
-    }
+    constexpr bool starts_with(const BasicString& str) const { return size() >= str.size() && memcmp(data(), str.data(), str.size()) == 0; }
 
     /**
      * Checks if the String begins with the given character.
@@ -635,8 +560,7 @@ public:
      * @param c a single character
      * @return true if the String begins with the provided character, false otherwise
      */
-    constexpr bool starts_with(value_type c) const
-    {
+    constexpr bool starts_with(value_type c) const {
         return size() > 0 && at(0) == c;
     }
 
@@ -646,9 +570,11 @@ public:
      * @param s a null-terminated character string
      * @return true if the String begins with the provided prefix, false otherwise
      */
-    constexpr bool starts_with(const_pointer s) const
-    {
-        return size() >= strlen(s) && memcmp(data(), s, strlen(s)) == 0;
+    constexpr bool starts_with(const_pointer s) const {
+        const auto l = cmptime::strlen(s);
+        if (size() < l)
+            return false;
+        return memcmp(data(), s, l) == 0;
     }
 
     /**
@@ -658,9 +584,10 @@ public:
      * @return true if the String ends with the provided suffix, false otherwise
      */
     // NOTE: the C++ standard wants me to use a basic_string_view param, but I have yet to implement that.
-    constexpr bool ends_with(const BasicString& str) const
-    {
-        return size() >= str.size() && memcmp(data() + size() - str.size(), str.data(), str.size()) == 0;
+    constexpr bool ends_with(const BasicString& str) const {
+        if (size() < str.size())
+            return false;
+        return memcmp(data() + size() - str.size(), str.data(), str.size()) == 0;
     }
 
     /**
@@ -669,9 +596,8 @@ public:
      * @param c a single character
      * @return true if the String ends with the provided character, false otherwise
      */
-    constexpr bool ends_with(value_type c) const
-    {
-        return size() > 0 && at(size() - 1) == c;
+    constexpr bool ends_with(value_type c) const {
+        return !empty() && at(size() - 1) == c;
     }
 
     /**
@@ -680,9 +606,10 @@ public:
      * @param s a null-terminated character string
      * @return true if the String ends with the provided suffix, false otherwise
      */
-    constexpr bool ends_with(const_pointer s) const
-    {
-        return size() >= strlen(s) && memcmp(data() + size() - strlen(s), s, strlen(s)) == 0;
+    constexpr bool ends_with(const_pointer s) const {
+        if (size() < cmptime::strlen(s))
+            return false;
+        return memcmp(data() + size() - cmptime::strlen(s), s, cmptime::strlen(s)) == 0;
     }
 
     /**
@@ -690,8 +617,7 @@ public:
      * @see https://en.cppreference.com/w/cpp/string/basic_string/swap
      * @param other string to exchange the contents with
      */
-    constexpr void swap(BasicString& other) noexcept
-    {
+    constexpr void swap(BasicString& other) noexcept {
         if (this == &other)
             return;
 
@@ -706,10 +632,7 @@ public:
      * @param str another String
      * @return true if the string contains the substring, false otherwise
      */
-    constexpr bool contains(const BasicString& str) const
-    {
-        return find(str) != npos;
-    }
+    constexpr bool contains(const BasicString& str) const { return find(str) != npos; }
 
     /**
      * Checks if the String contains the given character.
@@ -717,10 +640,7 @@ public:
      * @param c A single character
      * @return true if the string contains the character, false otherwise
      */
-    constexpr bool contains(value_type c) const
-    {
-        return find(c) != npos;
-    }
+    constexpr bool contains(value_type c) const { return find(c) != npos; }
 
     /**
      * Checks if the String contains the given substring.
@@ -728,10 +648,7 @@ public:
      * @param s A null-terminated character string
      * @return true if the string contains the substring, false otherwise
      */
-    constexpr bool contains(const_pointer s) const
-    {
-        return find(s) != npos;
-    }
+    constexpr bool contains(const_pointer s) const { return find(s) != npos; }
 
     /**
      * Replaces the part of the String indicated by [pos, pos + count) with a new String.
@@ -741,10 +658,7 @@ public:
      * @param str String to use for replacement
      * @return reference to this String after replacement
      */
-    constexpr BasicString& replace(size_type pos, size_type count, const BasicString& str)
-    {
-        return replace(pos, count, str, 0, str.size());
-    }
+    constexpr BasicString& replace(size_type pos, size_type count, const BasicString& str) { return replace(pos, count, str, 0, str.size()); }
 
     /**
      * Replaces the part of the String indicated by [pos, pos + count) with a new String.
@@ -757,10 +671,9 @@ public:
      * @param str_len Number of characters to replace with
      * @return reference to this String after replacement
      */
-    constexpr BasicString& replace(size_type from, size_type count, const BasicString& str, size_type str_from, size_type str_len = npos)
-    {
-        expect(from <= length());
-        expect(str_from <= str.length());
+    constexpr BasicString& replace(size_type from, size_type count, const BasicString& str, size_type str_from, size_type str_len = npos) {
+        CONSTEXPR_AWARE_ASSERT(from <= length());
+        CONSTEXPR_AWARE_ASSERT(str_from <= str.length());
         return *this;
     }
 
@@ -773,9 +686,8 @@ public:
      * @param cstr_len Number of characters to replace with
      * @return reference to this String after replacement
      */
-    constexpr BasicString& replace(size_type from, size_type count, const_pointer cstr, size_type cstr_len)
-    {
-        expect(from <= length());
+    constexpr BasicString& replace(size_type from, size_type count, const_pointer cstr, size_type cstr_len) {
+        CONSTEXPR_AWARE_ASSERT(from <= length());
 
         const auto new_size = length() - count + cstr_len;
         reserve(new_size);
@@ -788,14 +700,10 @@ public:
         return *this;
     }
 
-    constexpr BasicString& replace(size_type from, size_type count, const_pointer cstr)
-    {
-        return replace(from, count, cstr, strlen(cstr));
-    }
+    constexpr BasicString& replace(size_type from, size_type count, const_pointer cstr) { return replace(from, count, cstr, cmptime::strlen(cstr)); }
 
-    constexpr BasicString& replace(size_type from, size_type count, size_type ch_count, value_type ch)
-    {
-        expect(from <= length());
+    constexpr BasicString& replace(size_type from, size_type count, size_type ch_count, value_type ch) {
+        CONSTEXPR_AWARE_ASSERT(from <= length());
 
         if (ch_count == npos)
             ch_count = length() - from;
@@ -828,8 +736,7 @@ public:
      * @param pos Position at which to start the search
      * @return Position of the first character of the found substring or npos if no such substring is found
      */
-    constexpr size_type find(const BasicString& str, size_type pos = 0) const
-    {
+    constexpr size_type find(const BasicString& str, size_type pos = 0) const {
         return find(str.data(), pos, str.size());
     }
 
@@ -842,8 +749,7 @@ public:
      * @param count Length of substring to search for
      * @return Position of the first character of the found substring or npos if no such substring is found
      */
-    constexpr size_type find(const_pointer s, size_type pos, size_type count) const
-    {
+    constexpr size_type find(const_pointer s, size_type pos, size_type count) const {
         // a substring can be found only if pos <= size() - count
         if (pos > size() - count)
             return npos;
@@ -869,9 +775,8 @@ public:
      * @param pos Position at which to start the search
      * @return Position of the first character of the found substring or npos if no such substring is found
      */
-    constexpr size_type find(const_pointer s, size_type pos = 0) const
-    {
-        return find(s, pos, strlen(s));
+    constexpr size_type find(const_pointer s, size_type pos = 0) const {
+        return find(s, pos, cmptime::strlen(s));
     }
 
     /**
@@ -881,8 +786,7 @@ public:
      * @param pos Position at which to start the search
      * @return Position of the first character of the found substring or npos if no such substring is found
      */
-    constexpr size_type find(value_type ch, size_type pos = 0) const
-    {
+    constexpr size_type find(value_type ch, size_type pos = 0) const {
         return find(&ch, pos, 1);
     }
 
@@ -894,10 +798,9 @@ private:
      * @param count Length of the substring to move
      * @param to Position to move the substring to
      */
-    constexpr void move(size_type from, size_type count, size_type to)
-    {
-        expect(to + count <= capacity());
-        expect(from + count <= size());
+    constexpr void move(size_type from, size_type count, size_type to) {
+        CONSTEXPR_AWARE_ASSERT(to + count <= capacity());
+        CONSTEXPR_AWARE_ASSERT(from + count <= size());
 
         if (from == to)
             return;
@@ -917,10 +820,9 @@ private:
      * @param count Length of the substring to fill
      * @param ch Character to fill the substring with
      */
-    constexpr void fill(size_type from, size_type count, value_type ch)
-    {
-        expect(from <= size());
-        expect(from + count <= capacity());
+    constexpr void fill(size_type from, size_type count, value_type ch) {
+        CONSTEXPR_AWARE_ASSERT(from <= size());
+        CONSTEXPR_AWARE_ASSERT(from + count <= capacity());
 
         for (size_type i = from; i < from + count; i++)
             m_data[i] = ch;
@@ -933,22 +835,20 @@ private:
      * @param count Length of the substring to fill
      * @param cstr Pointer to a character string to fill the substring with
      */
-    constexpr void fill(size_type from, size_type count, const_pointer cstr)
-    {
-        expect(from <= size());
-        expect(from + count <= capacity());
+    constexpr void fill(size_type from, size_type count, const_pointer cstr) {
+        CONSTEXPR_AWARE_ASSERT(from <= size());
+        CONSTEXPR_AWARE_ASSERT(from + count <= capacity());
 
         for (size_type i = from; i < from + count; i++)
             m_data[i] = cstr[i - from];
     }
 
-    constexpr void grow(size_type new_capacity, bool allow_shrinking = false, size_type grow_factor = 2)
-    {
+    constexpr void grow(size_type new_capacity, bool allow_shrinking = false, size_type grow_factor = 2) {
         size_type optimal_cap = capacity();
         if (new_capacity <= optimal_cap && !allow_shrinking)
             return;
 
-        if (allow_shrinking) {
+        if (allow_shrinking && new_capacity < optimal_cap) {
             optimal_cap = new_capacity;
         } else {
             // So we don't get stuck in the while loop
@@ -963,7 +863,7 @@ private:
         // Allocate a new buffer and copy the old data into it.
         auto new_buffer = m_allocator.allocate(optimal_cap);
         if (m_data) {
-            memcpy(new_buffer, data(), length() + 1);
+            cmptime::memcpy(new_buffer, data(), length() + 1);
 
             // Get rid of the old buffer.
             dispose();
@@ -974,8 +874,7 @@ private:
         m_capacity = optimal_cap;
     }
 
-    constexpr void dispose()
-    {
+    constexpr void dispose() {
         m_allocator.deallocate(data(), capacity());
         m_data = nullptr;
     }

@@ -12,8 +12,7 @@ public:
     ReferenceCountedBase(ReferenceCountedBase&&) = delete;
     ReferenceCountedBase& operator=(ReferenceCountedBase&&) = delete;
 
-    ALWAYS_INLINE void ref()
-    {
+    ALWAYS_INLINE void ref() {
         ASSERT(m_ref_count > 0);
         m_ref_count++;
         kprintf("ReferenceCounted::ref(): %p: %d\n", this, m_ref_count);
@@ -23,13 +22,11 @@ public:
 
 protected:
     ReferenceCountedBase() = default;
-    ~ReferenceCountedBase()
-    {
+    ~ReferenceCountedBase() {
         ASSERT(m_ref_count == 0);
     }
 
-    ALWAYS_INLINE usize deref_base() const
-    {
+    ALWAYS_INLINE usize deref_base() const {
         ASSERT(m_ref_count > 0);
         return --m_ref_count;
     }
@@ -44,8 +41,7 @@ protected:
 template <typename T>
 class ReferenceCounted : public ReferenceCountedBase {
 public:
-    bool unref()
-    {
+    bool unref() {
         ASSERT(m_ref_count > 0);
         const auto references = deref_base();
         kprintf("ReferenceCounted::unref(): %p: %d\n", this, m_ref_count);
