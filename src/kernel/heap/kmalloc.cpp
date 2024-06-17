@@ -41,9 +41,13 @@ void MemoryManager::initialize(usize memory_start, usize memory_size) {
     // TODO fix this stupid kprintf bug
     kprintf("Heap initialized @ %p, ", memory_start);
     kprintln("%dK configured @ %d byte chunks", POOL_SIZE / KiB, CHUNK_SIZE);
+
+    m_initialized = true;
 }
 
 void* MemoryManager::allocate(usize size) {
+    kassert_msg(m_initialized, "Memory manager not initialized yet");
+
     Kernel::InterruptScope _;
     m_allocation_count++;
 

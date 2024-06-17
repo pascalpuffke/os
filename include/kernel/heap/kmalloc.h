@@ -43,6 +43,8 @@ private:
     usize m_free_count;
     usize m_free;
 
+    bool m_initialized;
+
     bool is_kmalloc_address(const void*);
 
     MemoryManager() = default;
