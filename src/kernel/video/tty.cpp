@@ -1,112 +1,101 @@
 #include <kernel/io/serial.h>
 #include <kernel/video/tty.h>
 #include <kernel/video/vga.h>
-#include <libc/string.h>
 
 namespace Kernel::TTY {
 
-usize row;
-usize column;
-u8 color;
+static constexpr auto video_memory_addr = 0xB8000;
+
+static bool initialized = false;
+
+usize current_row;
+usize current_column;
+u8 current_color;
 u16* buffer;
 
-void reset_color()
-{
-    color = VGA::entry_color(VGA::Color::LIGHT_GREEN, VGA::Color::BLACK);
+bool is_initialized() {
+    return initialized;
 }
 
-void initialize()
-{
-    row = 0;
-    column = 0;
-    buffer = reinterpret_cast<u16*>(0xB8000);
+void initialize() {
+    current_row = 0;
+    current_column = 0;
+    buffer = reinterpret_cast<u16*>(video_memory_addr);
     reset_color();
     for (usize y = 0; y < VGA::height; y++) {
         for (usize x = 0; x < VGA::width; x++) {
             const auto index = y * VGA::width + x;
-            buffer[index] = VGA::entry(' ', color);
+            buffer[index] = VGA::entry(' ', current_color);
         }
     }
     Cursor::enable(0x0F, 0x0F);
+    initialized = true;
 }
 
-void scroll()
-{
+void scroll() {
     for (usize i = 0; i < VGA::height; ++i) {
         for (usize j = 0; j < VGA::width; ++j) {
-            if (i == VGA::height - 1) {
-                buffer[i * VGA::width + j] = 0;
-            } else {
-                buffer[i * VGA::width + j] = buffer[(i + 1) * VGA::width + j];
-            }
+            const auto index = i * VGA::width + j;
+            if (i == VGA::height - 1)
+                buffer[index] = 0;
+            else
+                buffer[index] = buffer[(i + 1) * VGA::width + j];
         }
     }
 }
 
-void set_color(VGA::Color fg, VGA::Color bg)
-{
-    color = VGA::entry_color(fg, bg);
+void set_color(VGA::Color fg, VGA::Color bg) {
+    current_color = VGA::entry_color(fg, bg);
 }
 
-int put_entry_at(char c, u8 color, usize x, usize y)
-{
+void reset_color() {
+    current_color = VGA::entry_color(VGA::Color::LIGHT_GREEN, VGA::Color::BLACK);
+}
+
+int put_entry_at(char c, u8 color, usize x, usize y) {
     const auto index = y * VGA::width + x;
     buffer[index] = VGA::entry(c, color);
     return 1;
 }
 
-int put_char(char c)
-{
+int put_char(char c) {
     if (IO::Serial::ready())
-        IO::Serial::write(c);
+        IO::Serial::write(static_cast<u8>(c));
+
     switch (c) {
     case '\n': {
-        column = 0;
-        if (++row == VGA::height) {
+        current_column = 0;
+        if (++current_row == VGA::height) {
             scroll();
-            --row;
+            --current_row;
         }
-        Cursor::move(0, row);
+        Cursor::move(0, current_row);
     } break;
     case '\t': {
-        column += 4;
-        Cursor::move(column, row);
+        current_column += 4;
+        Cursor::move(current_column, current_row);
     } break;
     case '\b': {
-        if (column > 0)
-            column--;
-        Cursor::move(column, row);
+        if (current_column > 0)
+            current_column--;
+        Cursor::move(current_column, current_row);
     } break;
     default: {
-        put_entry_at(c, color, column, row);
-        if (++column == VGA::width) {
-            column = 0;
-            if (++row == VGA::height)
-                row = 0;
+        put_entry_at(c, current_color, current_column, current_row);
+        if (++current_column == VGA::width) {
+            current_column = 0;
+            if (++current_row == VGA::height)
+                current_row = 0;
         }
-        Cursor::move(column, row);
+        Cursor::move(current_column, current_row);
     }
     }
     return 1;
 }
 
-int write(const char* data, usize size)
-{
-    int written = 0;
-    for (usize i = 0; i < size; ++i)
-        written += put_char(data[i]);
-    return written;
-}
-
-int write_string(const char* data)
-{
-    return write(data, strlen(data));
-}
-
 namespace Cursor {
 
-    void enable(u8 start, u8 end)
-    {
+    void enable(u8 start, u8 end) {
         IO::outb(0x3D4, 0x0A);
         IO::outb(0x3D5, (IO::inb(0x3D5) & 0xC0) | start);
 
@@ -114,14 +103,12 @@ namespace Cursor {
         IO::outb(0x3D5, (IO::inb(0x3D5) & 0xE0) | end);
     }
 
-    void disable()
-    {
+    [[maybe_unused]] void disable() {
         IO::outb(0x3D4, 0x0A);
         IO::outb(0x3D5, 0x20);
     }
 
-    void move(usize x, usize y)
-    {
+    void move(usize x, usize y) {
         const auto position = y * VGA::width + x;
         IO::outb(0x3D4, 0x0F);
         IO::outb(0x3D5, static_cast<u8>(position & 0xFF));
@@ -129,8 +116,7 @@ namespace Cursor {
         IO::outb(0x3D5, static_cast<u8>((position >> 8) & 0xFF));
     }
 
-    u16 position()
-    {
+    [[maybe_unused]] u16 position() {
         u16 result = 0;
         IO::outb(0x3D4, 0x0F);
         result |= IO::inb(0x3D5);

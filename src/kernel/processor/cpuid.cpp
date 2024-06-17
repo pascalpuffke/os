@@ -1,55 +1,48 @@
 #include <kernel/processor/cpuid.h>
 
-#include <kernel/util/asm.h>
-
-#include <kernel/video/tty.h>
-#include <kernel/video/vga.h>
-
 #include <libc/string.h>
 
 namespace Kernel {
 
 // CPU vendor strings
-static constexpr const char* VENDOR_OLDAMD = "AMDisbetter!";
-static constexpr const char* VENDOR_AMD = "AuthenticAMD";
-static constexpr const char* VENDOR_INTEL = "GenuineIntel";
-static constexpr const char* VENDOR_VIA = "VIA VIA VIA ";
-static constexpr const char* VENDOR_OLDTRANSMETA = "TransmetaCPU";
-static constexpr const char* VENDOR_TRANSMETA = "GenuineTMx86";
-static constexpr const char* VENDOR_CYRIX = "CyrixInstead";
-static constexpr const char* VENDOR_CENTAUR = "CentaurHauls";
-static constexpr const char* VENDOR_NEXGEN = "NexGenDriven";
-static constexpr const char* VENDOR_UMC = "UMC UMC UMC ";
-static constexpr const char* VENDOR_SIS = "SiS SiS SiS ";
-static constexpr const char* VENDOR_NSC = "Geode by NSC";
-static constexpr const char* VENDOR_RISE = "RiseRiseRise";
-static constexpr const char* VENDOR_VORTEX = "Vortex86 SoC";
-static constexpr const char* VENDOR_OLDAO486 = "GenuineAO486";
-static constexpr const char* VENDOR_AO486 = "MiSTer AO486";
-static constexpr const char* VENDOR_ZHAOXIN = "  Shanghai  ";
-static constexpr const char* VENDOR_HYGON = "HygonGenuine";
-static constexpr const char* VENDOR_ELBRUS = "E2K MACHINE ";
+static constexpr StringView VENDOR_OLDAMD = "AMDisbetter!";
+static constexpr StringView VENDOR_AMD = "AuthenticAMD";
+static constexpr StringView VENDOR_INTEL = "GenuineIntel";
+static constexpr StringView VENDOR_VIA = "VIA VIA VIA ";
+static constexpr StringView VENDOR_OLDTRANSMETA = "TransmetaCPU";
+static constexpr StringView VENDOR_TRANSMETA = "GenuineTMx86";
+static constexpr StringView VENDOR_CYRIX = "CyrixInstead";
+static constexpr StringView VENDOR_CENTAUR = "CentaurHauls";
+static constexpr StringView VENDOR_NEXGEN = "NexGenDriven";
+static constexpr StringView VENDOR_UMC = "UMC UMC UMC ";
+static constexpr StringView VENDOR_SIS = "SiS SiS SiS ";
+static constexpr StringView VENDOR_NSC = "Geode by NSC";
+static constexpr StringView VENDOR_RISE = "RiseRiseRise";
+static constexpr StringView VENDOR_VORTEX = "Vortex86 SoC";
+static constexpr StringView VENDOR_OLDAO486 = "GenuineAO486";
+static constexpr StringView VENDOR_AO486 = "MiSTer AO486";
+static constexpr StringView VENDOR_ZHAOXIN = "  Shanghai  ";
+static constexpr StringView VENDOR_HYGON = "HygonGenuine";
+static constexpr StringView VENDOR_ELBRUS = "E2K MACHINE ";
 // Hypervisors
-static constexpr const char* VENDOR_QEMU = "TCGTCGTCGTCG";
-static constexpr const char* VENDOR_KVM = " KVMKVMKVM  ";
-static constexpr const char* VENDOR_VMWARE = "VMwareVMware";
-static constexpr const char* VENDOR_VIRTUALBOX = "VBoxVBoxVBox";
-static constexpr const char* VENDOR_XEN = "XenVMMXenVMM";
-static constexpr const char* VENDOR_HYPERV = "Microsoft Hv";
-static constexpr const char* VENDOR_PARALLELS = " prl hyperv ";
-static constexpr const char* VENDOR_PARALLELS_ALT = " lrpepyh vr ";
-static constexpr const char* VENDOR_BHYVE = "bhyve bhyve ";
-static constexpr const char* VENDOR_QNX = " QNXQVMBSQG ";
+static constexpr StringView VENDOR_QEMU = "TCGTCGTCGTCG";
+static constexpr StringView VENDOR_KVM = " KVMKVMKVM  ";
+static constexpr StringView VENDOR_VMWARE = "VMwareVMware";
+static constexpr StringView VENDOR_VIRTUALBOX = "VBoxVBoxVBox";
+static constexpr StringView VENDOR_XEN = "XenVMMXenVMM";
+static constexpr StringView VENDOR_HYPERV = "Microsoft Hv";
+static constexpr StringView VENDOR_PARALLELS = " prl hyperv ";
+static constexpr StringView VENDOR_PARALLELS_ALT = " lrpepyh vr ";
+static constexpr StringView VENDOR_BHYVE = "bhyve bhyve ";
+static constexpr StringView VENDOR_QNX = " QNXQVMBSQG ";
 
-void CPUID::get(CPUIDRequest request, u32 ecx)
-{
+void CPUID::get(CPUIDRequest request, u32 ecx) {
     asm volatile("cpuid"
                  : "=a"(m_eax), "=b"(m_ebx), "=c"(m_ecx), "=d"(m_edx)
                  : "a"(request), "c"(ecx));
 }
 
-const char* CPUID::vendor()
-{
+StringView CPUID::vendor() {
     get(CPUIDRequest::GET_VENDOR_STRING);
 
     char vendor[13];
@@ -61,8 +54,8 @@ const char* CPUID::vendor()
         vendor[i + 8] = static_cast<char>(m_ecx >> (i * 8));
     vendor[12] = '\0';
 
-#define RETURN_VENDOR(str)        \
-    if (strcmp(vendor, str) == 0) \
+#define RETURN_VENDOR(str)               \
+    if (strcmp(vendor, str.data()) == 0) \
         return str;
 
     RETURN_VENDOR(VENDOR_OLDAMD);
@@ -99,8 +92,7 @@ const char* CPUID::vendor()
     return "Unknown";
 }
 
-bool CPUID::has_feature(CPUFeature feature)
-{
+bool CPUID::has_feature(CPUFeature feature) {
     get(CPUIDRequest::GET_FEATURES);
 
 #define FEATURE(feat, reg, bit) \
@@ -177,8 +169,7 @@ bool CPUID::has_feature(CPUFeature feature)
 #undef FEATURE
 }
 
-ProcessorInfo CPUID::info()
-{
+ProcessorInfo CPUID::info() {
     get(CPUIDRequest::GET_FEATURES);
 
     ProcessorInfo info {
@@ -190,17 +181,17 @@ ProcessorInfo CPUID::info()
     const auto extended_model = (m_eax >> 16) & 0x0F;
     const auto extended_family = (m_eax >> 20) & 0xFF;
 
-    // The actual processor model is derived from the Model, Extended Model ID and Family ID fields.
-    // If the Family ID field is either 6 or 15, the model is equal to the sum of the Extended Model ID field shifted left by 4 bits and the Model field.
-    if (info.family == 6 || info.family == 15)
+    switch (info.family) {
+    case 6:
         info.model += extended_model << 4;
-    // Otherwise, the model is equal to the value of the Model field.
-
-    // The actual processor family is derived from the Family ID and Extended Family ID fields.
-    // If the Family ID field is equal to 15, the family is equal to the sum of the Extended Family ID and the Family ID fields.
-    if (info.family == 15)
+        break;
+    case 15:
         info.family += extended_family;
-    // Otherwise, the family is equal to value of the Family ID field.
+        info.model += extended_model << 4;
+        break;
+    default:
+        break;
+    }
 
     return info;
 }

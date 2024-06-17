@@ -13,10 +13,10 @@ namespace Kernel::TTY {
 void initialize();
 void reset_color();
 void set_color(VGA::Color, VGA::Color);
+bool is_initialized();
 int put_entry_at(char, u8 color, usize, usize);
 int put_char(char);
 int write(const char*, usize);
-int write_string(const char*);
 
 namespace Cursor {
 

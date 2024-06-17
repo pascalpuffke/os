@@ -2,12 +2,10 @@
 
 namespace Kernel::Interrupts {
 
-void PIT::enable()
-{
+void PIT::enable() {
 }
 
-void PIT::disable()
-{
+void PIT::disable() {
 }
 
 }

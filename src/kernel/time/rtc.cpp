@@ -4,12 +4,16 @@
 
 namespace Kernel::Time::RTC {
 
-static bool update_in_progress() { return IO::CMOS::read(0x0A) & 0x80; }
+static bool update_in_progress() {
+    return IO::CMOS::read(0x0A) & 0x80;
+}
 
-static u8 bcd_to_binary(u8 value) { return (value & 0x0F) + ((value >> 4) * 10); }
+static u8 bcd_to_binary(u32 value) {
+    u8 byte = static_cast<u8>(value);
+    return static_cast<u8>((byte & 0x0F) + ((byte >> 4) * 10));
+}
 
-static Time read()
-{
+static Time read() {
     Time time;
     while (update_in_progress()) {
         for (int i = 0; i < 1000; i++)
@@ -45,8 +49,7 @@ static Time read()
     return time;
 }
 
-Time now()
-{
+Time now() {
     return read();
 }
 

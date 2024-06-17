@@ -2,9 +2,22 @@
 .set ALIGN,    	 1<<0             /* align loaded modules on page boundaries */
 .set MEMINFO,  	 1<<1             /* provide memory map */
 .set VIDEOMODE,  1<<2
-.set FLAGS,    ALIGN | MEMINFO /*| VIDEOMODE */ /* this is the Multiboot 'flag' field */
+
+# Graphics configuration
+# 0: linear graphics, 1: EGA-standard text mode
+.set MODE_TYPE, 0
+
+# 0: no preference, else: pixels (linear) or rows/cols (text mode)
+.set WIDTH, 640
+.set HEIGHT, 480
+
+# 0: no preference/text, in linear graphics mode bits per pixel
+.set DEPTH, 24
+
 .set MAGIC,    0x1BADB002       /* 'magic number' lets bootloader find the header */
+.set FLAGS,    ALIGN | MEMINFO | VIDEOMODE /*| VIDEOMODE */ /* this is the Multiboot 'flag' field */
 .set CHECKSUM, -(MAGIC + FLAGS) /* checksum of above, to prove we are multiboot */
+
 /*
 Declare a multiboot header that marks the program as a kernel. These are magic
 values that are documented in the multiboot standard. The bootloader will
@@ -17,6 +30,15 @@ forced to be within the first 8 KiB of the kernel file.
 .long MAGIC
 .long FLAGS
 .long CHECKSUM
+.long 0 # header_addr
+.long 0 # load_addr
+.long 0 # load_end_addr
+.long 0 # bss_end_addr
+.long 0 # entry_addr
+.long MODE_TYPE
+.long WIDTH
+.long HEIGHT
+.long DEPTH
 
 /*
 The multiboot standard does not define the value of the stack pointer register
@@ -77,14 +99,6 @@ _start:
 	pushl %eax
 	pushl %ebx
 
-	/*
-	Enter the high-level kernel. The ABI requires the stack is 16-byte
-	aligned at the time of the call instruction (which afterwards pushes
-	the return pointer of size 4 bytes). The stack was originally 16-byte
-	aligned above and we've pushed a multiple of 16 bytes to the
-	stack since (pushed 0 bytes so far), so the alignment has thus been
-	preserved and the call is well defined.
-	*/
 	call kernel_main
 	/*
 	If the system has nothing more to do, put the computer into an

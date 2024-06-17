@@ -9,20 +9,18 @@ namespace Kernel {
  */
 class InterruptScope final {
 public:
-    InterruptScope()
-    {
-        m_were_interrupts_enabled = eflags() & CPU_FLAG_IF;
+    InterruptScope() {
+        m_if_set = has_flag(CPUFlag::InterruptEnable);
         cli();
     }
 
-    ~InterruptScope()
-    {
-        if (m_were_interrupts_enabled)
+    ~InterruptScope() {
+        if (m_if_set)
             sti();
     }
 
 private:
-    bool m_were_interrupts_enabled;
+    bool m_if_set;
 };
 
 }

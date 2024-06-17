@@ -5,8 +5,7 @@ namespace Kernel::IO::Serial {
 static constexpr u16 serial_port = 0x3F8;
 static bool initialized = false;
 
-Result<void> initialize()
-{
+Result<void> initialize() {
     outb(serial_port + 1, 0x00); // Disable all interrupts
     outb(serial_port + 3, 0x80); // Enable DLAB (set baud rate divisor)
     outb(serial_port + 0, 0x03); // Set divisor to 3 (lo byte) 38400 baud
@@ -17,49 +16,36 @@ Result<void> initialize()
     outb(serial_port + 4, 0x1E); // Set in loopback mode, test the serial chip
     outb(serial_port + 0, 0xAE); // Test serial chip (send byte 0xAE and check if serial returns same byte)
 
-    // Check if the serial chip is faulty
     if (inb(serial_port) != 0xAE)
         return Error { "Faulty serial chip" };
 
-    // If serial is not faulty, set the serial chip to normal mode
+    // Set serial chip to normal mode
     outb(serial_port + 4, 0x0F);
     initialized = true;
     return {};
 }
 
-bool ready()
-{
-    return initialized;
-}
+bool ready() { return initialized; }
 
-bool received()
-{
-    return inb(serial_port + 5) & 1;
-}
+bool received() { return inb(serial_port + 5) & 1; }
 
-bool is_transmit_empty()
-{
-    return inb(serial_port + 5) & 0x20;
-}
+bool is_transmit_empty() { return inb(serial_port + 5) & 0x20; }
 
-u8 read()
-{
+u8 read() {
     while (!received())
         ;
     return inb(serial_port);
 }
 
-void write(u8 byte)
-{
+void write(u8 byte) {
     while (!is_transmit_empty())
         ;
     outb(serial_port, byte);
 }
 
-void write_string(const char* data, usize length)
-{
+void write_string(const char* data, usize length) {
     for (usize i = 0; i < length; i++)
-        write(data[i]);
+        write(static_cast<u8>(data[i]));
 }
 
 }

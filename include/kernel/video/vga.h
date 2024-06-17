@@ -26,13 +26,11 @@ enum class Color : u8 {
     WHITE = 15,
 };
 
-static constexpr u8 entry_color(Color fg, Color bg)
-{
+static constexpr u8 entry_color(Color fg, Color bg) {
     return static_cast<u8>(fg) | static_cast<u8>(bg) << 4;
 }
 
-static constexpr u16 entry(unsigned char uc, u8 color)
-{
+static constexpr u16 entry(char uc, u8 color) {
     return static_cast<u16>(uc) | static_cast<u16>(color) << 8;
 }
 

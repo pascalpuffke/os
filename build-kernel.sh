@@ -10,7 +10,9 @@ LINKER=$CROSS_PREFIX/i686-elf-ld
 CXX=$CROSS_PREFIX/i686-elf-g++
 
 # Either make an ISO or run the raw multiboot kernel in qemu
-USE_ISO=0
+USE_ISO=1
+
+WARNINGS="-Wall -Wextra -Wshadow -Wold-style-cast -Woverloaded-virtual -Wpedantic -Wconversion -Wsign-conversion -Wimplicit-fallthrough"
 
 if [ ! -d "build" ]; then
 	mkdir build
@@ -21,45 +23,42 @@ boot() {
 
 	$ASSEMBLER src/boot.S -o build/boot.o
 	if [ $? -ne 0 ]; then
-		echo "failed with return code $?."
+		echo -e "\e[31mBuild failed with code $?.\e[0m"
 		exit 1
 	fi
-	echo "done."
 }
 
 libraries() {
+	local libc_flags="-Iinclude -ffreestanding -O3 $WARNINGS -Wno-unused-function -std=c++23 -fno-exceptions -fno-rtti"
+
 	echo -e "\e[36mBuilding \e[0mlibc... "
 
 	if [ ! -d "build/libc" ]; then
 		mkdir -p build/libc
 	fi
 
-	local libc_flags="-Iinclude -ffreestanding -O0 -Wall -Wextra -Werror -Wno-unused-function -std=gnu++20 -fno-exceptions -fno-rtti"
-
 	for file in $(find src/libraries/libc -name "*.cpp"); do
-		echo -ne "    \e[36mCompiling \e[0m$file... "
+		echo -e "    \e[36mCompiling \e[0m$file... "
 		$CXX -c $file -o build/libc/$(basename $file .cpp).o $libc_flags
 		if [ $? -ne 0 ]; then
-			echo -e "\e[31mfailed with return code $?.\e[0m"
+			echo -e "\e[31mBuild failed with code $?.\e[0m"
 			exit 1
 		fi
-		echo "done."
 	done
 }
 
 kernel() {
+	local kernel_flags="-Iinclude -ffreestanding -O3 $WARNINGS -Wno-unused-function -std=c++23 -fno-exceptions -fno-rtti"
+
 	echo -e "\e[36mBuilding \e[0mkernel... "
 
-	local kernel_flags="-Iinclude -ffreestanding -O0 -Wall -Wextra -Werror -Wno-unused-function -std=gnu++20 -fno-exceptions -fno-rtti"
-
 	for file in $(find src/kernel -name "*.cpp"); do
-		echo -ne "    \e[36mCompiling \e[0m$file... "
+		echo -e "    \e[36mCompiling \e[0m$file... "
 		$CXX -c $file -o build/$(basename $file .cpp).o $kernel_flags
 		if [ $? -ne 0 ]; then
-			echo -e "\e[31mfailed with return code $?.\e[0m"
+			echo -e "\e[31mBuild failed with return code $?.\e[0m"
 			exit 1
 		fi
-		echo "done."
 	done
 }
 
@@ -73,12 +72,12 @@ link() {
 		objects="$objects $file"
 	done
 
+	echo -e "\e[90m$CXX -T src/linker.ld -o build/kernel.bin $objects $linker_flags\e[0m"
 	$CXX -T src/linker.ld -o build/kernel.bin $objects $linker_flags
 	if [ $? -ne 0 ]; then
-		echo -e "\e[31mfailed with return code $?.\e[0m"
+		echo -e "\e[31mLinking failed with return code $?.\e[0m"
 		exit 1
 	fi
-	echo "done."
 }
 
 verify_multiboot() {
@@ -102,9 +101,9 @@ make_iso() {
 
 	if [ ! -f "iso/grub.cfg" ]; then
 		echo -e "    \e[36mgrub.cfg not found, creating\e[0m..."
-		echo "menuentry \"Kernel\" {" >> iso/grub.cfg
-		echo "	multiboot /boot/kernel.bin" >> iso/grub.cfg
-		echo "}" >> iso/grub.cfg
+		echo "menuentry \"Kernel\" {" >>iso/grub.cfg
+		echo "	multiboot /boot/kernel.bin" >>iso/grub.cfg
+		echo "}" >>iso/grub.cfg
 	fi
 
 	cp build/kernel.bin iso/boot/kernel.bin
@@ -113,7 +112,7 @@ make_iso() {
 }
 
 run_qemu() {
-	local qemu_flags="-serial stdio -m 3G --enable-kvm"
+	local qemu_flags="-serial stdio -m 128M --enable-kvm -cpu host -vga std"
 
 	if [ $USE_ISO -eq 0 ]; then
 		echo -e "    \e[36mRunning \e[0mQEMU with raw multiboot kernel..."

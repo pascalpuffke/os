@@ -9,29 +9,35 @@ void* operator new(usize);
 void operator delete(void*);
 void operator delete(void*, usize);
 
+namespace Kernel {
+
 class MemoryManager final {
 public:
-    static MemoryManager& get()
-    {
+    static MemoryManager& get() {
         static MemoryManager instance;
         return instance;
     }
 
-    void initialize(u64, u64);
+    MemoryManager(const MemoryManager&) = delete;
+    MemoryManager& operator=(const MemoryManager&) = delete;
+    MemoryManager(MemoryManager&&) = delete;
+    MemoryManager& operator=(MemoryManager&&) = delete;
+
+    void initialize(usize, usize);
     void* allocate(usize);
     void* allocate_aligned(usize, usize);
     void free(void*);
     void free_aligned(void*);
 
-    usize allocations() const;
-    usize frees() const;
-    usize allocated() const;
-    usize available() const;
-    usize total() const;
+    [[nodiscard]] usize allocations() const;
+    [[nodiscard]] usize frees() const;
+    [[nodiscard]] usize allocated() const;
+    [[nodiscard]] usize available() const;
+    [[nodiscard]] usize total() const;
 
 private:
-    u64 m_memory_start;
-    u64 m_memory_size;
+    usize m_memory_start;
+    usize m_memory_size;
     usize m_allocation_count;
     usize m_allocated;
     usize m_free_count;
@@ -40,9 +46,6 @@ private:
     bool is_kmalloc_address(const void*);
 
     MemoryManager() = default;
-
-    MemoryManager(const MemoryManager&) = delete;
-    MemoryManager& operator=(const MemoryManager&) = delete;
-    MemoryManager(MemoryManager&&) = delete;
-    MemoryManager& operator=(MemoryManager&&) = delete;
 };
+
+}

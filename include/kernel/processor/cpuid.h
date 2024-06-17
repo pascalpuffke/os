@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdlib/types.h>
+#include <stdlib/string_view.h>
 
 namespace Kernel {
 
@@ -94,17 +94,16 @@ struct ProcessorInfo {
     ProcessorType type;
 };
 
-static const char* cpu_feature_to_string(CPUFeature feature)
-{
+static StringView cpu_feature_to_string(CPUFeature feature) {
     // dear god.
-    return (const char*[]) {
+    return (StringView[]) {
         "acpi", "apic", "clflush", "cmov", "cx8", "de", "ds", "fpu", "fxsr", "htt", "ia64", "mca", "mce", "mmx", "msr", "mtrr", "pae", "pat", "pbe", "pge", "pse", "pse36", "psn", "sep", "ss", "sse", "sse2", "tm", "tsc", "tsc_deadline", "vme", "aes", "avx", "cid", "cx16", "dca", "ds_cpl", "dtes64", "est", "f16c", "fma", "hypervisor", "monitor", "movbe", "osxsave", "pcid", "pclmul", "pdcm", "popcnt", "rdrand", "sdbg", "smx", "sse3", "sse4_1", "sse4_2", "ssse3", "tm2", "vmx", "x2apic", "xsave", "xtpr", ""
-    }[(usize)feature];
+    }[static_cast<usize>(feature)];
 }
 
 class CPUID final {
 public:
-    const char* vendor();
+    StringView vendor();
     bool has_feature(CPUFeature);
     ProcessorInfo info();
 
