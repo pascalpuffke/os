@@ -23,25 +23,25 @@ public:
     MemoryManager(MemoryManager&&) = delete;
     MemoryManager& operator=(MemoryManager&&) = delete;
 
-    void initialize(usize, usize);
+    void initialize(u64, u64);
     void* allocate(usize);
     void* allocate_aligned(usize, usize);
     void free(void*);
     void free_aligned(void*);
 
-    [[nodiscard]] usize allocations() const;
-    [[nodiscard]] usize frees() const;
-    [[nodiscard]] usize allocated() const;
-    [[nodiscard]] usize available() const;
-    [[nodiscard]] usize total() const;
+    [[nodiscard]] u64 allocations() const;
+    [[nodiscard]] u64 frees() const;
+    [[nodiscard]] u64 allocated() const;
+    [[nodiscard]] u64 available() const;
+    [[nodiscard]] u64 total() const;
 
 private:
-    usize m_memory_start;
-    usize m_memory_size;
-    usize m_allocation_count;
-    usize m_allocated;
-    usize m_free_count;
-    usize m_free;
+    u64 m_memory_start;
+    u64 m_memory_size;
+    u64 m_allocation_count;
+    u64 m_allocated;
+    u64 m_free_count;
+    u64 m_free;
 
     bool m_initialized;
 

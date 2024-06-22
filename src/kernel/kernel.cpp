@@ -2,6 +2,8 @@
 
 #include <kernel/fs/vfs.h>
 #include <kernel/heap/kmalloc.h>
+#include <kernel/interrupts/gdt.h>
+#include <kernel/interrupts/pit.h>
 #include <kernel/io/serial.h>
 #include <kernel/processor/cpuid.h>
 #include <kernel/time/rtc.h>
@@ -36,18 +38,18 @@ extern const u8 _binary_bad_apple_bin_size;
 
 namespace Kernel {
 
-usize total_system_memory = 0;
+u64 total_system_memory = 0;
 
 Framebuffer* framebuffer;
 
 struct MemoryMapEntry {
-    usize address;
-    usize length;
+    u64 address;
+    u64 length;
 };
 
 MemoryMapEntry find_best_memory(const multiboot_info_t* mbd) {
-    usize address = 0;
-    usize length = 0;
+    u64 address = 0;
+    u64 length = 0;
 
     for (usize i = 0; i < mbd->mmap_length; i += sizeof(multiboot_memory_map_t)) {
         auto* mmap = reinterpret_cast<multiboot_memory_map_t*>(mbd->mmap_addr + i);
@@ -120,67 +122,35 @@ bool test_vbe(const Multiboot& multiboot) {
     const auto vbe = maybe_vbe.release();
     const auto control_info = VBE::read_vbe_info(vbe.control_info);
 
-    if (!strcmp(control_info.signature, "VESA") == 0) {
+    if (!strcmp(control_info.signature, "VESA") == 0)
         panic("invalid VBE control info signature");
-    }
     kprintln("VBE present. Version %x", control_info.version);
 
     return true;
 }
 
-Optional<MultibootFramebuffer> test_framebuffer(const Multiboot& multiboot) {
+Framebuffer* setup_framebuffer(const Multiboot& multiboot) {
     auto maybe_fb = multiboot.framebuffer();
     if (!maybe_fb)
-        return Optional<MultibootFramebuffer>::empty();
-    const auto fb = maybe_fb.release();
+        return nullptr;
+    const auto mb_fb = maybe_fb.release();
 
-    return fb;
-}
+    const auto type = mb_fb.type;
+    const auto width = mb_fb.width;
+    const auto height = mb_fb.height;
+    const auto depth = mb_fb.depth;
+    const auto pitch = mb_fb.pitch;
+    u8* address = reinterpret_cast<u8*>(mb_fb.address);
 
-void setup_framebuffer(const MultibootFramebuffer& multiboot_fb) {
-    kprintf("Framebuffer present @ 0x%X. ", multiboot_fb.address);
-    kprintf("%dx%d px, ", multiboot_fb.width, multiboot_fb.height);
-    kprintf("%d bpp, ", multiboot_fb.depth);
-    kprintln("type '%s' (%d)", framebuffer_type_to_string(multiboot_fb.type), multiboot_fb.type);
+    kprintf("Framebuffer present @ %p. ", address);
+    kprintf("%dx%d px, ", width, height);
+    kprintf("%d bpp, %d pitch, ", depth, pitch);
+    kprintln("type '%s' (%d)", framebuffer_type_to_string(type), type);
 
-    framebuffer = new Framebuffer(
-        reinterpret_cast<u8*>(multiboot_fb.address),
-        multiboot_fb.width,
-        multiboot_fb.height,
-        multiboot_fb.pitch,
-        multiboot_fb.depth);
-
-    switch (multiboot_fb.type) {
-    case MultibootFramebufferType::EGA_TEXT:
-    case MultibootFramebufferType::INDEXED:
+    if (type != MultibootFramebufferType::RGB)
         panic("Unsupported multiboot framebuffer type");
-        break;
-    case MultibootFramebufferType::RGB: {
-        auto* write_buffer = framebuffer->write_buffer();
 
-        const auto put_pixel = [write_buffer, &multiboot_fb](u32 x, u32 y, u32 color) {
-            u32 location = x * 3 + y * multiboot_fb.pitch;
-            write_buffer[location] = color & 0xFF;
-            write_buffer[location + 1] = (color >> 8) & 0xFF;
-            write_buffer[location + 2] = (color >> 16) & 0xFF;
-        };
-
-        const auto min = [](auto a, auto b) {
-            return a < b ? a : b;
-        };
-
-        for (u32 x = 0; x < multiboot_fb.width; x++) {
-            for (u32 y = 0; y < multiboot_fb.height; y++) {
-                const u8 r = static_cast<u8>(min(x, 0xFF));
-                const u8 g = static_cast<u8>(min(y, 0xFF));
-                const u8 b = 0xFF;
-                // put_pixel(x, y, (r << 16 | g << 8 | b));
-            }
-        }
-
-        framebuffer->swap_buffers();
-    } break;
-    }
+    return new Framebuffer(address, width, height, pitch, depth);
 }
 
 void play_the_funny() {
@@ -195,7 +165,7 @@ void play_the_funny() {
     usize data_size = _binary_bad_apple_bin_end - _binary_bad_apple_bin_start;
     usize size_per_frame = width * height;
 
-    const auto put_pixel = [](u8* buffer, u32 x, u32 y, u32 color, u32 pitch) {
+    const auto put_pixel = [](u8* buffer, u32 x, u32 y, u8 color, u32 pitch) {
         u32 location = x * 3 + y * pitch;
         buffer[location] = color;
         buffer[location + 1] = color;
@@ -240,6 +210,8 @@ void play_the_funny() {
         }
 
         framebuffer->swap_buffers();
+
+        IO::wait_for(10000);
     }
 }
 
@@ -276,32 +248,16 @@ extern "C" [[gnu::used]] void kernel_main(multiboot_info_t* mbd, u32 magic) {
     kprintln("%s", multiboot.boot_loader_name().value_or("(no name)"));
     TTY::reset_color();
 
-    if (!test_vbe(multiboot)) {
+    if (!test_vbe(multiboot))
         panic("VESA BIOS Extensions (VBE) not present");
-    }
 
     initialize_memory_manager(memory_map_entry.address, memory_map_entry.length);
-
-    if (auto maybe_fb = test_framebuffer(multiboot); maybe_fb) {
-        const auto multiboot_fb = maybe_fb.release();
-        setup_framebuffer(multiboot_fb);
-    }
+    framebuffer = setup_framebuffer(multiboot);
 
     auto cpuid = CPUID();
     print_cpu_info(cpuid);
 
     play_the_funny();
-
-    {
-        usize count = 0;
-        while (true) {
-            IO::wait_for(640000);
-            ++count;
-            kprintln("second %d?", count);
-            if (count == 5)
-                break;
-        }
-    }
 
     delete framebuffer;
 }

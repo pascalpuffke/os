@@ -26,7 +26,7 @@ static constexpr usize BITMAP_SIZE = (POOL_SIZE / CHUNK_SIZE / 8);
 // 1 bit per chunk. 1 = allocated, 0 = free.
 static u8 bitmap[BITMAP_SIZE];
 
-void MemoryManager::initialize(usize memory_start, usize memory_size) {
+void MemoryManager::initialize(u64 memory_start, u64 memory_size) {
     kassert_msg(memory_size > POOL_SIZE, "Not enough memory for the heap");
     // TODO Perhaps it would be smarter to continue with the maximum possible heap size
     //      instead of crashing when asked for too much?
@@ -150,11 +150,11 @@ bool MemoryManager::is_kmalloc_address(const void* ptr) {
     return pointer >= memory_start && pointer <= memory_start + POOL_SIZE;
 }
 
-usize MemoryManager::allocations() const { return m_allocation_count; }
-usize MemoryManager::frees() const { return m_free_count; }
-usize MemoryManager::allocated() const { return m_allocated; }
-usize MemoryManager::available() const { return m_free; }
-usize MemoryManager::total() const { return POOL_SIZE; }
+u64 MemoryManager::allocations() const { return m_allocation_count; }
+u64 MemoryManager::frees() const { return m_free_count; }
+u64 MemoryManager::allocated() const { return m_allocated; }
+u64 MemoryManager::available() const { return m_free; }
+u64 MemoryManager::total() const { return POOL_SIZE; }
 
 }
 
