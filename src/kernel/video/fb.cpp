@@ -17,9 +17,8 @@ Framebuffer::Framebuffer(u8* hw_buffer, u32 width, u32 height, u32 pitch, u32 de
     kprintln("Creating framebuffer %dx%d %dbpp size %d", width, height, depth, m_buffer_size);
     m_back_buffer = static_cast<u8*>(kmalloc(m_buffer_size));
 
-    if (!m_back_buffer) {
+    if (!m_back_buffer)
         panic("Framebuffer allocation failed. Ensure the memory manager has enough resources available to handle the requested resolution.");
-    }
 
     clear();
 

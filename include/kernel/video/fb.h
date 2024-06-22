@@ -30,13 +30,12 @@ public:
     [[nodiscard]] u32 size() const;
 
 private:
+    u8* m_front_buffer;
     u32 m_width;
     u32 m_height;
     u32 m_pitch;
     u32 m_depth;
     u32 m_buffer_size;
-
-    u8* m_front_buffer;
     u8* m_back_buffer;
 };
 
