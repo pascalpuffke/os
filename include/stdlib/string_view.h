@@ -126,15 +126,9 @@ public:
      * @brief Moves the end of the view back by n characters.
      *        This does not change the underlying data at all, but only shrinks the length of the view.
      * @param n number of characters to remove from the end of the view
-     * @param chop_data set all characters in underlying storage after this point to null (unsafe)
      */
-    constexpr void remove_suffix(size_type n, bool chop_data = false) {
+    constexpr void remove_suffix(size_type n) {
         CONSTEXPR_AWARE_ASSERT(n <= size());
-
-        if (chop_data) {
-            const auto offset = sizeof(value_type) * size() - n;
-            cmptime::memset(const_cast<pointer>(m_data + offset), '\0', n);
-        }
 
         m_length -= n;
     }
